@@ -1,0 +1,8 @@
+{
+    "add-field": [
+        {"name": "gender", "type": "string", "stored": "True", "indexed": "True"}
+    ],
+    "add-dynamic-field": [
+        {"name": "*_test-dynamic", "type": "string", "stored": "True", "indexed": "True"}
+    ]
+}
