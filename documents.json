@@ -1,0 +1,25 @@
+[
+	{
+		"id": 1,
+		"gender": "Male",
+		"age": 25,
+		"name": "John Doe",
+		"email": "john.doe@gmail.com",
+		"address": "123 Main St",
+		"city": "New York",
+		"state": "NY",
+		"search-for": "Female"
+	},
+	{
+		"id": 2,
+		"gender": "Female",
+		"age": 30,
+		"name": "Jane Doe",
+		"email": "jane.doe@gmail.com",
+		"address": "456 Main St",
+		"city": "Los Angeles",
+		"state": "CA",
+		"search-for": "Male",
+		"liked-users": "John Doe"
+	}
+]

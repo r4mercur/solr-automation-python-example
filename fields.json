@@ -1,8 +1,15 @@
 {
     "add-field": [
-        {"name": "gender", "type": "string", "stored": "True", "indexed": "True"}
+		{"name": "email", "type": "string", "stored": "True", "indexed": "True"},
+        {"name": "gender", "type": "string", "stored": "True", "indexed": "True"},
+		{"name": "age", "type": "int", "stored": "True", "indexed": "True"},
+		{"name": "name", "type": "string", "stored": "True", "indexed": "True"},
+		{"name": "address", "type": "string", "stored": "True", "indexed": "True"},
+		{"name": "city", "type": "string", "stored": "True", "indexed": "True"},
+		{"name": "state", "type": "string", "stored": "True", "indexed": "True"},
+		{"name": "search-for", "type": "string", "stored": "True", "indexed": "True"},
     ],
     "add-dynamic-field": [
-        {"name": "*_test-dynamic", "type": "string", "stored": "True", "indexed": "True"}
+        {"name": "*_liked-users", "type": "string", "stored": "True", "indexed": "True"}
     ]
 }

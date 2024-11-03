@@ -6,9 +6,9 @@ services:
     volumes:
       - .:/workspace
     networks: [search]
-    # environment:
-      # SOLR_URL: "http://solr:8983/solr"
-      # SOLR_COLLECTION: "your_collection_name"
+    environment:
+      SOLR_URL: "http://solr:8983/solr"
+      SOLR_COLLECTION: "my_collection"
     depends_on:
       - solr
 
