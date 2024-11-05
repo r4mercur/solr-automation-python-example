@@ -1,4 +1,17 @@
 services:
+  devcontainer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/workspace
+    networks: [search]
+    environment:
+      SOLR_URL: "http://solr:8983/solr"
+      SOLR_COLLECTION: "my_collection"
+    depends_on:
+      - solr
+
   solr:
     image: solr:9-slim
     ports:
@@ -7,6 +20,8 @@ services:
     environment:
       SOLR_MODE: "solrcloud"
       ZK_HOST: "zoo:2181"
+    depends_on:
+      - zoo
 
   zoo:
     image: zookeeper:3.9
