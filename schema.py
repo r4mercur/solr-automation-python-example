@@ -4,14 +4,6 @@ import json
 
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
-
-# Solr server URL
-solr_url = os.getenv('SOLR_URL')
-# Collection name
-collection_name = os.getenv('SOLR_COLLECTION')
-
 
 def update_solr_schema(temp_solr_url: str, temp_collection_name: str, temp_schema: dict) -> None:
     schema_url = f'{temp_solr_url}/{temp_collection_name}/schema'
@@ -30,11 +22,21 @@ def reload_solr_collection(temp_solr_url: str, temp_collection_name: str) -> Non
         print(f'Failed to reload collection {temp_collection_name}: {response.text}')
 
 
-schema_file_path = os.path.join(os.path.dirname(__file__), 'fields.json')
-with open(schema_file_path, 'r') as schema_file:
-    schema = json.load(schema_file)
+
+if __name__ == '__main__':
+    # Load environment variables
+    load_dotenv()
+
+    # Solr server URL
+    solr_url = os.getenv('SOLR_URL')
+    # Collection name
+    collection_name = os.getenv('SOLR_COLLECTION')
+
+    schema_file_path = os.path.join(os.path.dirname(__file__), 'fields.json')
+    with open(schema_file_path, 'r') as schema_file:
+        schema = json.load(schema_file)
 
 
-update_solr_schema(solr_url, collection_name, schema)
+    update_solr_schema(solr_url, collection_name, schema)
 
-reload_solr_collection(solr_url, collection_name)
+    reload_solr_collection(solr_url, collection_name)
