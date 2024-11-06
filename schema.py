@@ -22,6 +22,18 @@ def reload_solr_collection(temp_solr_url: str, temp_collection_name: str) -> Non
         print(f'Failed to reload collection {temp_collection_name}: {response.text}')
 
 
+def add_field_to_existing_schema(temp_solr: str, temp_collection: str, new_field: str) -> None:
+    schema_url = f'{temp_solr}/{temp_collection}/schema'
+    response = requests.get(schema_url)
+    temp_schema = response.json()
+    temp_schema['fields'].append(json.loads(new_field))
+
+    response = requests.post(schema_url, json=temp_schema)
+    if response.status_code == 200:
+        print('Field added successfully.')
+    else:
+        print(f'Failed to add field: {response.text}')
+
 
 if __name__ == '__main__':
     # Load environment variables
