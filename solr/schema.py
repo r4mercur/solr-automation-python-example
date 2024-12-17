@@ -5,6 +5,18 @@ import json
 from dotenv import load_dotenv
 
 
+def main() -> None:
+    load_dotenv()
+    solr_url = os.getenv('SOLR_URL')
+    collection_name = os.getenv('SOLR_COLLECTION')
+
+    schema_file_path = os.path.join(os.path.dirname(__file__), '../json/fields.json')
+    with open(schema_file_path, 'r') as schema_file:
+        schema = json.load(schema_file)
+
+    update_solr_schema(solr_url, collection_name, schema)
+    reload_solr_collection(solr_url, collection_name)
+
 def update_solr_schema(temp_solr_url: str, temp_collection_name: str, temp_schema: dict) -> None:
     schema_url = f'{temp_solr_url}/{temp_collection_name}/schema'
     response = requests.get(schema_url)
@@ -44,19 +56,4 @@ def reload_solr_collection(temp_solr_url: str, temp_collection_name: str) -> Non
 
 
 if __name__ == '__main__':
-    # Load environment variables
-    load_dotenv()
-
-    # Solr server URL
-    solr_url = os.getenv('SOLR_URL')
-    # Collection name
-    collection_name = os.getenv('SOLR_COLLECTION')
-
-    schema_file_path = os.path.join(os.path.dirname(__file__), '../json/fields.json')
-    with open(schema_file_path, 'r') as schema_file:
-        schema = json.load(schema_file)
-
-
-    update_solr_schema(solr_url, collection_name, schema)
-
-    reload_solr_collection(solr_url, collection_name)
+    main()

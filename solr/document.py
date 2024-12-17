@@ -6,6 +6,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from faker.proxy import Faker
 
 
+def main() -> None:
+    load_dotenv()
+    solr_url = os.getenv('SOLR_URL')
+    collection_name = os.getenv('SOLR_COLLECTION')
+    create_documents(solr_url, collection_name)
+
 def add_documents_to_solr(solr: pysolr.Solr, documents: list) -> None:
     print(f'Adding {len(documents)} documents to Solr')
     solr.add(documents)
@@ -55,12 +61,4 @@ def create_documents(temp_solr_url: str, temp_collection_name: str) -> None:
 
 
 if __name__ == '__main__':
-    # Load environment variables
-    load_dotenv()
-
-    # Solr server URL
-    solr_url = os.getenv('SOLR_URL')
-    # Collection name
-    collection_name = os.getenv('SOLR_COLLECTION')
-
-    create_documents(solr_url, collection_name)
+    main()
