@@ -52,7 +52,7 @@ if __name__ == '__main__':
     # Collection name
     collection_name = os.getenv('SOLR_COLLECTION')
 
-    schema_file_path = os.path.join(os.path.dirname(__file__), 'fields.json')
+    schema_file_path = os.path.join(os.path.dirname(__file__), '../json/fields.json')
     with open(schema_file_path, 'r') as schema_file:
         schema = json.load(schema_file)
 

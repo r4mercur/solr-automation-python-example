@@ -13,13 +13,6 @@ def create_solr_collection(temp_solr_url: str, temp_collection_name: str) -> Non
     else:
         print(f'Failed to create collection {temp_collection_name}: {response.text}')
 
-def create_documents(temp_solr_url: str, temp_collection_name: str) -> None:
-    solr = pysolr.Solr(temp_solr_url + "/" + temp_collection_name,
-                       always_commit=True)
-    documents = json.load(open('documents.json'))
-    solr.add(documents)
-    print('Documents added successfully.')
-
 
 if __name__ == '__main__':
     # Load environment variables
@@ -32,6 +25,3 @@ if __name__ == '__main__':
 
     # Create the collection
     create_solr_collection(solr_url, collection_name)
-
-    # Create example documents
-    create_documents(solr_url, collection_name)

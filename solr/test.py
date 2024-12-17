@@ -54,7 +54,7 @@ class TestSolrIntegration(unittest.TestCase):
             raise Exception(f'Failed to delete collection {collection_name}: {response.text}')
 
     def test_update_solr_schema(self):
-        schema_file_path = os.path.join(os.path.dirname(__file__), 'fields.json')
+        schema_file_path = os.path.join(os.path.dirname(__file__), '../json/fields.json')
         with open(schema_file_path, 'r') as schema_file:
             schema = json.load(schema_file)
 
