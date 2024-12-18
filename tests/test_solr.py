@@ -13,6 +13,9 @@ class TestSolrIntegration(unittest.TestCase):
         cls.compose = DockerCompose(os.path.dirname(__file__))
         cls.compose.start()
 
+        # wait seconds for all services to start
+        time.sleep(10)
+
         load_dotenv()
         cls.solr_url = 'http://localhost:8983/solr'
         cls.collection_name = 'test_collection'
