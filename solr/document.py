@@ -1,8 +1,9 @@
 import os
 import pysolr
 import time
+import numpy as np
 from dotenv import load_dotenv
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from faker.proxy import Faker
 
 
@@ -12,49 +13,71 @@ def main() -> None:
     collection_name = os.getenv('SOLR_COLLECTION')
     create_documents(solr_url, collection_name)
 
-def add_documents_to_solr(solr: pysolr.Solr, documents: list) -> None:
-    print(f'Adding {len(documents)} documents to Solr')
-    solr.add(documents)
 
-def generate_documents(start_index: int, end_index: int, fake: Faker) -> list:
+def pre_generate_random_data(chunk_size: int) -> tuple:
+    genders = np.random.choice(['Male', 'Female', 'Diverse'], size=chunk_size)
+    ages = np.random.randint(18, 80, size=chunk_size)
+    return genders, ages
+
+
+def add_documents_to_solr(solr_clients: list, documents: list, batch_size: int = 10_000) -> None:
+    num_clients = len(solr_clients)
+    for index in range(0, len(documents), batch_size):
+        client_index = (index // batch_size) % num_clients
+        solr_clients[client_index].add(documents[index: index + batch_size])
+        print(f'Added documents {index} to {index + batch_size} to Solr using client {client_index}')
+
+
+def generate_documents(start_index: int, chunk_size: int) -> list:
+    fake = Faker()
     documents = []
-    for index in range(start_index, end_index):
+    genders, ages = pre_generate_random_data(chunk_size)
+
+    for index in range(chunk_size):
+        id_ = index + start_index
         documents.append({
-            "id": index,
-            "gender": fake.random_element(elements=('Male', 'Female', 'Diverse')),
-            "age": fake.random_int(min=18, max=80),
+            "id": id_,
+            "gender": str(genders[index]),
+            "age": int(ages[index]),
             "name": fake.name(),
             "email": fake.email(),
             "address": fake.address(),
             "city": fake.city(),
             "state": fake.state(),
-            "search-for": fake.random_element(elements=('Male', 'Female', 'Diverse')),
+            "search-for": str(genders[index]),
         })
-        print(f'Generated document {index}:{documents[-1]}')
+        print(f'Generated document {id_}:{documents[-1]}')
 
     return documents
 
+
+def get_solr_client(url: str, collection_name: str) -> pysolr.Solr:
+    return pysolr.Solr(url + "/" + collection_name, always_commit=True)
+
 def create_documents(temp_solr_url: str, temp_collection_name: str) -> None:
-    solr = pysolr.Solr(temp_solr_url + "/" + temp_collection_name, always_commit=True)
-    fake = Faker()
-
+    clients = [get_solr_client(temp_solr_url, temp_collection_name) for _ in range(10)]
     start_time = time.time()
-    chunk_size = 10000
-    number_of_documents = 500000
-    number_of_threads = 10
-    documents = []
+    chunk_size = 50_000
+    number_of_documents = 500_000 # note that should take around 2-3 minutes to run (5 million documents (7 minutes))
+    max_processes = os.cpu_count() or 16
+    number_of_threads = 100
 
-    with ThreadPoolExecutor(max_workers=number_of_threads) as executor:
-        futures = [executor.submit(generate_documents, index, index + chunk_size, fake)
-                   for index in range(1, number_of_documents + 1, chunk_size)]
+    with ProcessPoolExecutor(max_workers=max_processes) as process_executors, \
+            ThreadPoolExecutor(max_workers=number_of_threads) as threads_executors:
+
+        tasks = []
+        futures = [
+            process_executors.submit(generate_documents, index, chunk_size)
+            for index in range(1, number_of_documents + 1, chunk_size)
+        ]
+
         for future in as_completed(futures):
-            documents.extend(future.result())
+            documents = future.result()
+            tasks.append(threads_executors.submit(add_documents_to_solr, clients,
+                                                  documents, 10_000))
 
-
-    with ThreadPoolExecutor() as executor:
-        for index in range(0, len(documents), chunk_size):
-            chunk = documents[index:index + chunk_size]
-            executor.submit(add_documents_to_solr, solr, chunk)
+        for task in as_completed(tasks):
+            task.result()
 
     end_time = time.time()
     print(f'Documents added successfully in {end_time - start_time} seconds.')
