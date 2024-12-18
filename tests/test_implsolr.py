@@ -14,11 +14,9 @@ from solr.schema import update_solr_schema, reload_solr_collection
 class TestImplementationSolr(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.compose = DockerCompose(os.path.dirname(__file__))
+        cls.compose = DockerCompose(os.path.dirname(__file__),
+                                    compose_file_name='docker-compose.test.yml')
         cls.compose.start()
-
-        # wait seconds for all services to start
-        time.sleep(10)
 
         load_dotenv()
         cls.solr_url = os.getenv('SOLR_URL')

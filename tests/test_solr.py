@@ -10,11 +10,9 @@ class TestSolrIntegration(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.compose = DockerCompose(os.path.dirname(__file__))
+        cls.compose = DockerCompose(os.path.dirname(__file__),
+                                    compose_file_name='docker-compose.test.yml')
         cls.compose.start()
-
-        # wait seconds for all services to start
-        time.sleep(10)
 
         load_dotenv()
         cls.solr_url = 'http://localhost:8983/solr'
