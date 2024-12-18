@@ -9,6 +9,7 @@
 		{"name": "state", "type": "string", "stored": "True", "indexed": "True"},
 		{"name": "search-for", "type": "string", "stored": "True", "indexed": "True"}
     ],
+	"delete-field": [],
     "add-dynamic-field": [
         {"name": "*_liked-users", "type": "string", "stored": "True", "indexed": "True"}
     ]

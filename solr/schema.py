@@ -28,20 +28,43 @@ def update_solr_schema(temp_solr_url: str, temp_collection_name: str, temp_schem
     current_schema = response.json()
     temp_current_schema = current_schema.get('schema', {})
 
-    schema_version = temp_current_schema.get('version')
+    current_version = temp_current_schema.get('version', 1.0)
     existing_fields = {field['name'] for field in temp_current_schema.get('fields', [])}
+    json_fields = {field['name'] for field in temp_schema.get('add-field', [])}
+    json_delete_fields = {field['name'] for field in temp_schema.get('delete-field', [])}
+
 
     new_fields = [field for field in temp_schema.get('add-field', [])
                   if field['name'] not in existing_fields]
 
-    if not new_fields:
-        print(f'No new fields to add, to schema with version: {schema_version}')
+    necessary_fields = {'id', '_text_', '_nest_path_', '_root_', '_version_'}
+    fields_to_remove = [field for field in existing_fields
+                        if field not in json_fields and field not in necessary_fields]
+    # Include fields explicitly marked for deletion
+    fields_to_remove.extend([field for field in json_delete_fields
+                             if field in existing_fields and field not in necessary_fields])
+
+    update_payload = {}
+
+    if new_fields:
+        update_payload['add-field'] = new_fields
+
+    if fields_to_remove:
+        update_payload['delete-field'] = [{'name': field} for field in fields_to_remove]
+
+    if not new_fields and not fields_to_remove:
+        print(f'No changes to the schema with version: {current_version}')
         return
 
-    update_payload = {'add-field': new_fields}
     response = requests.post(schema_url, json=update_payload)
     if response.status_code == 200:
         print('Schema updated successfully.')
+        commit_url = f'{temp_solr_url}/{temp_collection_name}/update?commit=true'
+        commit_response = requests.get(commit_url)
+        if commit_response.status_code == 200:
+            print('Changes committed successfully.')
+        else:
+            print(f'Failed to commit changes: {commit_response.text}')
     else:
         print(f'Failed to update schema: {response.text}')
 

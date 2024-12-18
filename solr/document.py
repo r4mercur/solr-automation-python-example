@@ -12,7 +12,7 @@ def main() -> None:
     solr_url = os.getenv('SOLR_URL')
     collection_name = os.getenv('SOLR_COLLECTION')
     # note that should take around 2-3 minutes to run (5 million documents (7 minutes))
-    create_documents(solr_url, collection_name, 500_000, 50_000)
+    create_documents(solr_url, collection_name, 100, 10)
 
 
 def pre_generate_random_data(chunk_size: int) -> tuple:
