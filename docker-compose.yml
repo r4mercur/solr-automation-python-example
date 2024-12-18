@@ -14,6 +14,27 @@ services:
     environment:
       ZOO_4LW_COMMANDS_WHITELIST: "mntr,conf,ruok"
 
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+        - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+        GF_SECURITY_ADMIN_PASSWORD: "admin"
+    volumes:
+      - ./grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+
+
+volumes:
+    grafana_data:
+
 networks:
   search:
     driver: bridge

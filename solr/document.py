@@ -5,12 +5,18 @@ import numpy as np
 from dotenv import load_dotenv
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from faker.proxy import Faker
+from prometheus_client import Counter, Gauge, start_http_server
 
+DOCUMENTS_PROCESSED = Counter('documents_processed', 'Number of documents processed', ['status'])
+DOCUMENTS_ADDED = Counter('documents_added', 'Number of documents added', ['status'])
+PROCESS_TIME = Gauge('process_time', 'Time taken to process documents')
 
 def main() -> None:
     load_dotenv()
     solr_url = os.getenv('SOLR_URL')
     collection_name = os.getenv('SOLR_COLLECTION')
+    # start monitoring
+    start_http_server(8000)
     # note that should take around 2-3 minutes to run (5 million documents (7 minutes))
     create_documents(solr_url, collection_name, 100, 10)
 
@@ -26,6 +32,7 @@ def add_documents_to_solr(solr_clients: list, documents: list, batch_size: int =
     for index in range(0, len(documents), batch_size):
         client_index = (index // batch_size) % num_clients
         solr_clients[client_index].add(documents[index: index + batch_size])
+        DOCUMENTS_ADDED.labels(status='added').inc(len(documents[index: index + batch_size]))
         print(f'Added documents {index} to {index + batch_size} to Solr using client {client_index}')
 
 
@@ -47,6 +54,7 @@ def generate_documents(start_index: int, chunk_size: int) -> list:
             "state": fake.state(),
             "search-for": str(genders[index]),
         })
+        DOCUMENTS_PROCESSED.labels(status='processed').inc()
         print(f'Generated document {id_}:{documents[-1]}')
 
     return documents
@@ -79,6 +87,7 @@ def create_documents(temp_solr_url: str, temp_collection_name: str, number_of_do
             task.result()
 
     end_time = time.time()
+    PROCESS_TIME.set(end_time - start_time)
     print(f'Documents added successfully in {end_time - start_time} seconds.')
 
 
