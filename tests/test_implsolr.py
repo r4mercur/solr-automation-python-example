@@ -17,6 +17,9 @@ class TestImplementationSolr(unittest.TestCase):
         cls.compose = DockerCompose(os.path.dirname(__file__))
         cls.compose.start()
 
+        # wait seconds for all services to start
+        time.sleep(10)
+
         load_dotenv()
         cls.solr_url = os.getenv('SOLR_URL')
         cls.collection_name = os.getenv('SOLR_COLLECTION')
