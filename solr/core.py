@@ -13,7 +13,7 @@ def main() -> None:
 
 
 def create_solr_collection(temp_solr_url: str, temp_collection_name: str) -> None:
-    create_collection_url = f'{temp_solr_url}/admin/collections?action=CREATE&name={temp_collection_name}&numShards=1&replicationFactor=1&collection.configName=_default'
+    create_collection_url = f'{temp_solr_url}/admin/collections?action=CREATE&name={temp_collection_name}&numShards=1&replicationFactor=1'
     response = requests.get(create_collection_url)
     if response.status_code == 200:
         print(f'Collection {temp_collection_name} created successfully.')

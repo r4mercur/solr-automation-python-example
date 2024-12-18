@@ -11,7 +11,8 @@ def main() -> None:
     load_dotenv()
     solr_url = os.getenv('SOLR_URL')
     collection_name = os.getenv('SOLR_COLLECTION')
-    create_documents(solr_url, collection_name)
+    # note that should take around 2-3 minutes to run (5 million documents (7 minutes))
+    create_documents(solr_url, collection_name, 500_000, 50_000)
 
 
 def pre_generate_random_data(chunk_size: int) -> tuple:
@@ -54,11 +55,9 @@ def generate_documents(start_index: int, chunk_size: int) -> list:
 def get_solr_client(url: str, collection_name: str) -> pysolr.Solr:
     return pysolr.Solr(url + "/" + collection_name, always_commit=True)
 
-def create_documents(temp_solr_url: str, temp_collection_name: str) -> None:
+def create_documents(temp_solr_url: str, temp_collection_name: str, number_of_documents: int, chunk_size: int) -> None:
     clients = [get_solr_client(temp_solr_url, temp_collection_name) for _ in range(10)]
     start_time = time.time()
-    chunk_size = 50_000
-    number_of_documents = 500_000 # note that should take around 2-3 minutes to run (5 million documents (7 minutes))
     max_processes = os.cpu_count() or 16
     number_of_threads = 100
 
