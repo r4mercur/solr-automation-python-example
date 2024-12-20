@@ -6,6 +6,29 @@ from dotenv import load_dotenv
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from faker.proxy import Faker
 from prometheus_client import Counter, Gauge, start_http_server
+from pydantic import BaseModel, EmailStr, Field, ValidationError
+
+class EmailValidator(BaseModel):
+    email: EmailStr
+
+class SolrDocument(BaseModel):
+    id: int
+    gender: str
+    age: int = Field(..., ge=18, le=80)
+    name: str
+    email: EmailStr
+    address: str
+    city: str
+    state: str
+    search_for: str
+
+    @staticmethod
+    def cast_to_email_str(value: str) -> EmailStr:
+        try:
+            validated = EmailValidator.model_validate({'email': value})
+            return validated.email
+        except ValidationError as e:
+            raise ValueError(f"Invalid email: {value}") from e
 
 DOCUMENTS_PROCESSED = Counter('documents_processed', 'Number of documents processed', ['status'])
 DOCUMENTS_ADDED = Counter('documents_added', 'Number of documents added', ['status'])
@@ -43,19 +66,23 @@ def generate_documents(start_index: int, chunk_size: int) -> list:
 
     for index in range(chunk_size):
         id_ = index + start_index
-        documents.append({
-            "id": id_,
-            "gender": str(genders[index]),
-            "age": int(ages[index]),
-            "name": fake.name(),
-            "email": fake.email(),
-            "address": fake.address(),
-            "city": fake.city(),
-            "state": fake.state(),
-            "search-for": str(genders[index]),
-        })
-        DOCUMENTS_PROCESSED.labels(status='processed').inc()
-        print(f'Generated document {id_}:{documents[-1]}')
+        try:
+            document = SolrDocument(
+                id=id_,
+                gender=str(genders[index]),
+                age=int(ages[index]),
+                name=fake.name(),
+                email=SolrDocument.cast_to_email_str(fake.email()),
+                address=fake.address(),
+                city=fake.city(),
+                state=fake.state(),
+                search_for=str(genders[index])
+            )
+            documents.append(document.model_dump())
+            DOCUMENTS_PROCESSED.labels(status='processed').inc()
+            print(f'Generated document {id_}:{documents[-1]}')
+        except ValidationError as e:
+            print(f'Validation error for document {id_}: {e}')
 
     return documents
 
