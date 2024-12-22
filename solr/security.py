@@ -5,6 +5,7 @@ import time
 from typing import cast, Protocol
 
 import bcrypt
+import pyfiglet
 import requests
 from dotenv import load_dotenv
 from kazoo.client import KazooClient
@@ -20,8 +21,7 @@ def main() -> None:
     load_dotenv()
     zk_host = os.getenv('ZK_HOST', 'zoo:2181')
 
-    for _ in range(3):
-        print('#' * 80)
+    print_ascii_title()
 
     print(f'This script will update the security.json file with the hashed password for Solr security.')
 
@@ -133,6 +133,17 @@ def solr_auth(solr_url: str, username: str = "admin", password: str = "") -> Non
             print(f'Authentication failed: {response.text}')
     except Exception as e:
         print(f'Failed to authenticate: {e}')
+
+def print_ascii_title() -> None:
+    art = pyfiglet.figlet_format("SOLR SECURITY")
+
+    art_lines = [line for line in art.split("\n") if line.strip()]
+    max_width = max(len(line) for line in art_lines)
+
+    print("#" * (max_width + 4))
+    for line in art_lines:
+        print(f"# {line.ljust(max_width)} #")
+    print("#" * (max_width + 4))
 
 if __name__ == '__main__':
     main()
