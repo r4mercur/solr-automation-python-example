@@ -1,0 +1,8 @@
+{
+    "authentication": {
+        "class": "solr.BasicAuthPlugin",
+        "credentials": {
+            "admin": "$2b$12$9hajnmo93tAmJdmIL8hmI.1S3GmTOvv/nT3pVzg54EnfimeLUxikG"
+        }
+    }
+}
