@@ -1,10 +1,11 @@
+import base64
 import getpass
+import hashlib
 import json
 import os
 import time
 from typing import cast, Protocol
 
-import bcrypt
 import pyfiglet
 import requests
 from dotenv import load_dotenv
@@ -36,16 +37,12 @@ def main() -> None:
     security_json_path = os.path.join(os.path.dirname(__file__), '../json/security.json')
     with open(security_json_path, 'r', encoding='utf-8') as security_file:
         security = json.load(security_file)
-        security['authentication']['credentials']['admin'] = hashed_password
+        security['authentication']['credentials']['solr'] = hashed_password
 
     # Write the updated security.json
     with open(security_json_path, 'w', encoding='utf-8') as security_file:
         json.dump(security, cast(SupportsWrite, security_file), indent=4)
 
-    stored_hash = security['authentication']['credentials']['admin']
-    if not verify_password(password, stored_hash):
-        print("Hash verification failed. Aborting.")
-        return
 
     # Upload security.json to ZooKeeper
     upload_security_to_zookeeper(zk_host, security_json_path)
@@ -57,15 +54,20 @@ def main() -> None:
     # Test Solr authentication
     time.sleep(5)
     solr_url = os.getenv('SOLR_URL')
-    solr_auth(solr_url, username='admin', password=password)
+    solr_auth(solr_url, username='solr', password=password)
 
 
 def hash_password(password: str) -> str:
-    salt = bcrypt.gensalt(rounds=12)
-    return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
+    salt = os.urandom(16)
+    salt_base64 = base64.b64encode(salt).decode('utf-8')
+    salted_password = salt + password.encode('utf-8')
 
-def verify_password(password: str, hashed: str) -> bool:
-    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+    hash1 = hashlib.sha256(salted_password).digest()
+    hash2 = hashlib.sha256(hash1).digest()
+
+    hash_base64 = base64.b64encode(hash2).decode('utf-8')
+
+    return f"{hash_base64} {salt_base64}"
 
 def upload_security_to_zookeeper(zk_host: str, security_json_path: str) -> None:
     print(f"Uploading security.json to ZooKeeper at {zk_host}...")
@@ -116,7 +118,7 @@ def restart_all_nodes(zk_host: str) -> None:
     zk.stop()
     print("All Solr nodes have been restarted.")
 
-def solr_auth(solr_url: str, username: str = "admin", password: str = "") -> None:
+def solr_auth(solr_url: str, username: str = "solr", password: str = "") -> None:
     print(f'Testing Solr authentication with {solr_url}...')
 
     if password == "":
