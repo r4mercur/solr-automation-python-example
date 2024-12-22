@@ -26,4 +26,4 @@ The schema defines the fields that are available in the Solr core.
 You can adjust the schema to your needs. 
 
 What you would do is add or remove fields from the schema. 
-This is done via the json file `fields.json` and at wards executed by the `schema.py` script again.
+This is done via the json file `fields.json` and after wards executed by the `schema.py` script again.
