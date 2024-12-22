@@ -13,6 +13,8 @@ services:
     networks: [search]
     environment:
       ZOO_4LW_COMMANDS_WHITELIST: "mntr,conf,ruok"
+    ports:
+      - "2181:2181"
 
 networks:
   search:

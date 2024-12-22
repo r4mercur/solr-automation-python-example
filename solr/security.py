@@ -40,8 +40,7 @@ def main() -> None:
         security['authentication']['credentials']['solr'] = hashed_password
 
     # Write the updated security.json
-    with open(security_json_path, 'w', encoding='utf-8') as security_file:
-        json.dump(security, cast(SupportsWrite, security_file), indent=4)
+    write_to_file(security_json_path, security)
 
 
     # Upload security.json to ZooKeeper
@@ -56,6 +55,29 @@ def main() -> None:
     solr_url = os.getenv('SOLR_URL')
     solr_auth(solr_url, username='solr', password=password)
 
+def security_main_for_test(password: str) -> None:
+    load_dotenv()
+    zk_host = os.getenv('ZK_HOST', 'zoo:2181')
+
+    security_json_path = os.path.join(os.path.dirname(__file__), '../json/security.json')
+    with open(security_json_path, 'r', encoding='utf-8') as security_file:
+        security = json.load(security_file)
+        security['authentication']['credentials']['solr'] = hash_password(password)
+
+    # Write the updated security.json
+    write_to_file(security_json_path, security)
+
+    # Upload security.json to ZooKeeper
+    upload_security_to_zookeeper(zk_host, security_json_path)
+    verify_upload_to_zk(zk_host)
+
+    # Restart all Solr nodes
+    restart_all_nodes(zk_host)
+
+
+def write_to_file(security_json_path: str, security: str) -> None:
+    with open(security_json_path, 'w', encoding='utf-8') as security_file:
+        json.dump(security, cast(SupportsWrite, security_file), indent=4)
 
 def hash_password(password: str) -> str:
     salt = os.urandom(16)
