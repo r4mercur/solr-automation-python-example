@@ -1,15 +1,18 @@
 import os
-import pysolr
 import time
-import numpy as np
-from dotenv import load_dotenv
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+
+import numpy as np
+import pysolr
+from dotenv import load_dotenv
 from faker.proxy import Faker
 from prometheus_client import Counter, Gauge, start_http_server
 from pydantic import BaseModel, EmailStr, Field, ValidationError
 
+
 class EmailValidator(BaseModel):
     email: EmailStr
+
 
 class SolrDocument(BaseModel):
     id: int
@@ -30,9 +33,11 @@ class SolrDocument(BaseModel):
         except ValidationError as e:
             raise ValueError(f"Invalid email: {value}") from e
 
+
 DOCUMENTS_PROCESSED = Counter('documents_processed', 'Number of documents processed', ['status'])
 DOCUMENTS_ADDED = Counter('documents_added', 'Number of documents added', ['status'])
 PROCESS_TIME = Gauge('process_time', 'Time taken to process documents')
+
 
 def main() -> None:
     load_dotenv()
@@ -89,6 +94,7 @@ def generate_documents(start_index: int, chunk_size: int) -> list:
 
 def get_solr_client(url: str, collection_name: str) -> pysolr.Solr:
     return pysolr.Solr(url + "/" + collection_name, always_commit=True)
+
 
 def create_documents(temp_solr_url: str, temp_collection_name: str, number_of_documents: int, chunk_size: int) -> None:
     clients = [get_solr_client(temp_solr_url, temp_collection_name) for _ in range(10)]
