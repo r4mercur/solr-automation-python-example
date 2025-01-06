@@ -19,5 +19,5 @@ COPY . .
 # Set environment variables if needed
 ENV PYTHONUNBUFFERED=1
 
-# Expose any necessary ports
-EXPOSE 8983
+# Run the automatation & make sure the right values in .env are configured
+CMD [ "python", "solr" ]
