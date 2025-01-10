@@ -19,5 +19,11 @@
         "user-role": {
             "solr": "admin"
         }
+    },
+    "certificateAuthentication": {
+        "class": "solr.CertAuthPlugin",
+        "blockUnknown": true,
+        "forwardCredentials": true,
+        "trustedCertificates": ""
     }
 }

@@ -26,18 +26,34 @@ def main() -> None:
 
     print(f'This script will update the security.json file with the hashed password for Solr security.')
 
-    # Dialog for user to input the password which will be used in security.json & for solr security
-    print('Prompting for password...')
-    password = getpass.getpass(prompt='Enter the password for Solr security: ')
+    auth_method = input('Choose authentication method (1: basic, 2: cert): ')
 
-    # Hash the password
-    hashed_password = hash_password(password)
+    if auth_method == '1' or auth_method == 'basic':
+        # Dialog for user to input the password which will be used in security.json & for solr security
+        print('Prompting for password...')
+        password = getpass.getpass(prompt='Enter the password for Solr security: ')
 
-    # Update security.json with the hashed password
-    security_json_path = os.path.join(os.path.dirname(__file__), '../json/security.json')
-    with open(security_json_path, 'r', encoding='utf-8') as security_file:
-        security = json.load(security_file)
-        security['authentication']['credentials']['solr'] = hashed_password
+        # Hash the password
+        hashed_password = hash_password(password)
+
+        # Update security.json with the hashed password
+        security_json_path = os.path.join(os.path.dirname(__file__), '../json/security.json')
+        with open(security_json_path, 'r', encoding='utf-8') as security_file:
+            security = json.load(security_file)
+            security['authentication']['credentials']['solr'] = hashed_password
+    
+    elif auth_method == '2' or auth_method == 'cert':
+        cert_path = input('Enter the path to the certificate file: ')
+        security_json_path = os.path.join(os.path.dirname(__file__), '../json/security.json')
+        with open(security_json_path, 'r', encoding='utf-8') as security_file:
+            security = json.load(security_file)
+            security['authentication']['class'] = "solr.CertAuthPlugin"
+            security['authentication']['trustedCertificates'] = cert_path
+    
+    else:
+        print('Invalid choice. Exiting...')
+        return
+
 
     # Write the updated security.json
     write_to_file(security_json_path, security)

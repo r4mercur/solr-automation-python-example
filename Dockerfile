@@ -1,4 +1,3 @@
-
 FROM python:3.12-bookworm
 
 # Install any additional dependencies
