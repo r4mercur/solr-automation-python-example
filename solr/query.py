@@ -3,17 +3,21 @@ import os
 import pysolr
 from dotenv import load_dotenv
 
+from solr.security import print_ascii_title
+
 
 def main() -> None:
     load_dotenv()
     solr_url = os.getenv("SOLR_URL")
     collection_name = os.getenv("SOLR_COLLECTION")
 
+    print_ascii_title("SOLR QUERY")
+
     print("Querying without filter...")
     query_solr_collection(solr_url, collection_name)
 
     print("Querying with filter...")
-    query_solr_with_filter(solr_url, collection_name, "John")
+    query_solr_with_filter(solr_url, collection_name, "Robert Stevens")
 
     print("Querying document count...")
     document_count = query_document_count(solr_url, collection_name)
@@ -32,9 +36,8 @@ def query_solr_collection(solr_url: str, collection_name: str) -> str:
 
 def query_solr_with_filter(solr_url: str, collection_name: str, name: str) -> str:
     solr = pysolr.Solr(solr_url + "/" + collection_name, always_commit=True)
-    results = solr.search(
-        "name:" + name, **{"q.op": "OR", "indent": "true", "useParams": ""}
-    )
+    query = f'name:"{name}"'
+    results = solr.search(query, **{"q.op": "OR", "indent": "true", "useParams": ""})
 
     for result in results:
         print(result)

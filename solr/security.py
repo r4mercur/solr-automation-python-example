@@ -22,7 +22,7 @@ def main() -> None:
     load_dotenv()
     zk_host = os.getenv('ZK_HOST', 'zoo:2181')
 
-    print_ascii_title()
+    print_ascii_title("SOLR SECURITY")
 
     print(f'This script will update the security.json file with the hashed password for Solr security.')
 
@@ -174,8 +174,8 @@ def solr_auth(solr_url: str, username: str = "solr", password: str = "") -> None
     except Exception as e:
         print(f'Failed to authenticate: {e}')
 
-def print_ascii_title() -> None:
-    art = pyfiglet.figlet_format("SOLR SECURITY")
+def print_ascii_title(title: str) -> None:
+    art = pyfiglet.figlet_format(title)
 
     art_lines = [line for line in art.split("\n") if line.strip()]
     max_width = max(len(line) for line in art_lines)
