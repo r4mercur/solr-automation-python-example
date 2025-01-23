@@ -6,7 +6,7 @@ import numpy as np
 import pysolr
 from dotenv import load_dotenv
 from faker.proxy import Faker
-from prometheus_client import Counter, Gauge, start_http_server
+from prometheus_client import Counter, Gauge, start_http_server, REGISTRY
 from pydantic import BaseModel, EmailStr, Field, ValidationError
 
 
@@ -34,9 +34,13 @@ class SolrDocument(BaseModel):
             raise ValueError(f"Invalid email: {value}") from e
 
 
-DOCUMENTS_PROCESSED = Counter('documents_processed', 'Number of documents processed', ['status'])
-DOCUMENTS_ADDED = Counter('documents_added', 'Number of documents added', ['status'])
-PROCESS_TIME = Gauge('process_time', 'Time taken to process documents')
+# Check if the metrics are already registered
+if 'documents_processed' not in REGISTRY._names_to_collectors:
+    DOCUMENTS_PROCESSED = Counter('documents_processed', 'Number of documents processed', ['status'])
+if 'documents_added' not in REGISTRY._names_to_collectors:
+    DOCUMENTS_ADDED = Counter('documents_added', 'Number of documents added', ['status'])
+if 'process_time' not in REGISTRY._names_to_collectors:
+    PROCESS_TIME = Gauge('process_time', 'Time taken to process documents')
 
 
 def main() -> None:
@@ -45,7 +49,6 @@ def main() -> None:
     collection_name = os.getenv('SOLR_COLLECTION')
     # start monitoring
     start_http_server(8000)
-    # note that should take around 2-3 minutes to run (5 million documents (7 minutes))
     create_documents(solr_url, collection_name, 100, 10)
 
 
