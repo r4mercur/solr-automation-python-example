@@ -30,9 +30,14 @@ def update_solr_schema(temp_solr_url: str, temp_collection_name: str, temp_schem
 
     current_version = temp_current_schema.get('version', 1.0)
     existing_fields = {field['name'] for field in temp_current_schema.get('fields', [])}
+    existing_field_types = {field['name'] for field in temp_current_schema.get('fieldTypes', [])}
+
     json_fields = {field['name'] for field in temp_schema.get('add-field', [])}
     json_delete_fields = {field['name'] for field in temp_schema.get('delete-field', [])}
 
+
+    new_field_types = [ft for ft in temp_schema.get('add-field-type', [])
+                      if ft['name'] not in existing_field_types]
 
     new_fields = [field for field in temp_schema.get('add-field', [])
                   if field['name'] not in existing_fields]
@@ -46,11 +51,17 @@ def update_solr_schema(temp_solr_url: str, temp_collection_name: str, temp_schem
 
     update_payload = {}
 
+    if new_field_types:
+        update_payload['add-field-type'] = new_field_types
+
     if new_fields:
         update_payload['add-field'] = new_fields
 
     if fields_to_remove:
         update_payload['delete-field'] = [{'name': field} for field in fields_to_remove]
+
+    if new_field_types:
+        print(f'Adding new field types: {new_field_types}')
 
     if not new_fields and not fields_to_remove:
         print(f'No changes to the schema with version: {current_version}')

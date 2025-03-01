@@ -1,4 +1,12 @@
 {
+	"add-field-type": [
+		{
+		"name": "knn_vector",
+		"class": "solr.DenseVectorField",
+		"vectorDimension": 384,
+		"similarityFunction": "cosine"
+		}
+	],
     "add-field": [
 		{"name": "email", "type": "string", "stored": "True", "indexed": "True"},
         {"name": "gender", "type": "string", "stored": "True", "indexed": "True"},
@@ -7,7 +15,8 @@
 		{"name": "address", "type": "string", "stored": "True", "indexed": "True"},
 		{"name": "city", "type": "string", "stored": "True", "indexed": "True"},
 		{"name": "state", "type": "string", "stored": "True", "indexed": "True"},
-		{"name": "search_for", "type": "string", "stored": "True", "indexed": "True"}
+		{"name": "search_for", "type": "string", "stored": "True", "indexed": "True"},
+		{"name": "vector_field", "type": "knn_vector", "stored": "True", "indexed": "True"}
     ],
 	"delete-field": [],
     "add-dynamic-field": [
