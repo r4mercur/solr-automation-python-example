@@ -19,18 +19,26 @@ def main() -> None:
     model = SentenceTransformer("all-MiniLM-L6-v2")
 
     documents = generate_documents(0, 1000)
-    documents_with_embeddings = [index_document_with_embeddings(doc, model) for doc in documents]
+    documents_with_embeddings = [
+        index_document_with_embeddings(doc, model) for doc in documents
+    ]
 
     solr.add(documents_with_embeddings)
     solr.commit()
 
     response = solr.search("*:*", rows=5)
     print(f"Total documents in Solr: {response.hits}")
-    print("Sample document:", json.dumps(response.docs[0] if response.docs else "No documents found", indent=2))
+    print(
+        "Sample document:",
+        json.dumps(
+            response.docs[0] if response.docs else "No documents found", indent=2
+        ),
+    )
 
     query = "What is the capital of France?"
     results = semantic_search(query, solr_url_with_collection, model)
     print(results)
+
 
 def index_document_with_embeddings(doc: dict, model: SentenceTransformer) -> dict:
     text_to_embedding = f"{doc['name']} {doc['email']} {doc['address']} {doc['city']} {doc['state']} {doc['search_for']}"
@@ -39,18 +47,17 @@ def index_document_with_embeddings(doc: dict, model: SentenceTransformer) -> dic
     return doc
 
 
-def semantic_search(query: str, solr_url: str, model: SentenceTransformer, top_k: int = 100) -> list:
+def semantic_search(
+    query: str, solr_url: str, model: SentenceTransformer, top_k: int = 100
+) -> list:
     query_embedding = model.encode(query)
-    
+
     # Create vector string
     vector_str = "[" + ",".join(str(x) for x in query_embedding.tolist()) + "]"
-    
+
     # Build query parameters using standard q parameter
-    params = {
-        "q": f"{{!knn f=vector_field topK={top_k}}}{vector_str}",
-        "fl": "*,score"
-    }
-    
+    params = {"q": f"{{!knn f=vector_field topK={top_k}}}{vector_str}", "fl": "*,score"}
+
     solr = pysolr.Solr(solr_url)
     results = solr.search(**params)
 
