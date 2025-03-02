@@ -1,10 +1,12 @@
-import pysolr
-import os
 import json
+import os
 
-from sentence_transformers import SentenceTransformer
+import pysolr
 from dotenv import load_dotenv
+from sentence_transformers import SentenceTransformer
+
 from document import generate_documents
+
 
 def main() -> None:
     load_dotenv()
@@ -20,6 +22,7 @@ def main() -> None:
     documents_with_embeddings = [index_document_with_embeddings(doc, model) for doc in documents]
 
     solr.add(documents_with_embeddings)
+    solr.commit()
 
     response = solr.search("*:*", rows=5)
     print(f"Total documents in Solr: {response.hits}")
@@ -30,11 +33,9 @@ def main() -> None:
     print(results)
 
 def index_document_with_embeddings(doc: dict, model: SentenceTransformer) -> dict:
-    # Add vector embeddings to before indexing
-    if 'text' in doc:
-        embedding = model.encode(doc['text'])
-        doc['vector_field'] = embedding.tolist()
-
+    text_to_embedding = f"{doc['name']} {doc['email']} {doc['address']} {doc['city']} {doc['state']} {doc['search_for']}"
+    embedding = model.encode(text_to_embedding)
+    doc["vector_field"] = embedding.tolist()
     return doc
 
 
