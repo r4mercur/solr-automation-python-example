@@ -85,7 +85,7 @@ def main() -> None:
             print(f"{i}. {doc.get('title', 'No title')} - Score: {doc.get('score', 0)}")
 
 
-def load_queries_from_json(file_path: str) -> list:
+def load_queries_from_json(file_path: str) -> dict:
     with open(file_path, "r") as file:
         queries = json.load(file)
     return queries
