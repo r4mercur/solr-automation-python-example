@@ -1,0 +1,12 @@
+{
+  "sentences": [
+    {
+      "query": "France related",
+      "content": "What is the capital of France?"
+    },
+    {
+      "query": "Germany related",
+      "content": "Do you speak German?"
+    }
+  ]
+}

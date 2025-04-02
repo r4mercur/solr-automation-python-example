@@ -4,12 +4,12 @@ import os
 import pysolr
 from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
-from transformers import AutoModelForCausalLM
 
 from document import generate_documents
 
 SEMANTIC_WITH_PRETRAINED_MODEL = False
 HYBRID_SEARCH_WITH_SOLR_LTR = False
+
 
 def main() -> None:
     load_dotenv()
@@ -45,9 +45,14 @@ def main() -> None:
         )
 
         # fyi: find similar documents based on this query sentence
-        query = "What is the capital of France?"
+        queries = load_queries_from_json("../json/sentences.json")
+        sentences = queries["sentences"]
+        query = sentences[0]["content"]
         results = semantic_search(query, solr_url_with_collection, model)
-        print("Sample documents with semantic search (vector based):" , json.dumps(results, indent=2))
+        print(
+            "Sample documents with semantic search (vector based):",
+            json.dumps(results, indent=2),
+        )
 
     if HYBRID_SEARCH_WITH_SOLR_LTR:
         model = SentenceTransformer("all-MiniLM-L6-v2")
@@ -72,7 +77,7 @@ def main() -> None:
             model=model,
             text_weight=0.4,
             vector_weight=0.6,
-            top_k=10
+            top_k=10,
         )
 
         print(f"Top results for query '{query}':")
@@ -80,18 +85,27 @@ def main() -> None:
             print(f"{i}. {doc.get('title', 'No title')} - Score: {doc.get('score', 0)}")
 
 
+def load_queries_from_json(file_path: str) -> list:
+    with open(file_path, "r") as file:
+        queries = json.load(file)
+    return queries
+
+
 def index_document_with_embeddings(doc: dict, model: SentenceTransformer) -> dict:
     # Create a meaningful text representation from document fields
     fields = load_solr_fields()
-    text_to_embedding = " ".join([f"{doc.get(field, '')}" for field in fields if field in doc])
+    text_to_embedding = " ".join(
+        [f"{doc.get(field, '')}" for field in fields if field in doc]
+    )
 
     if not text_to_embedding.strip():
         text_to_embedding = "No text available for this document"
-    
+
     # Generate vector embedding
     embedding = model.encode(text_to_embedding)
     doc["vector_field"] = embedding.tolist()
     return doc
+
 
 def semantic_search(
     query: str, solr_url: str, model: SentenceTransformer, top_k: int = 100
@@ -105,22 +119,24 @@ def semantic_search(
         "q": "*:*",
         "fq": f"{{!knn f=vector_field topK={top_k}}}{vector_str}",
         "fl": "*,score",
-        "rows": top_k
+        "rows": top_k,
     }
 
     solr = pysolr.Solr(solr_url)
     results = solr.search(**params)
 
-    print(f"Found {len(results.docs)} results with KNN search, lasted for {results.qtime}ms")
+    print(
+        f"Found {len(results.docs)} results with KNN search, lasted for {results.qtime}ms"
+    )
     return results.docs
 
 
 def load_solr_fields() -> list[str]:
     results = []
-    with open('json/fields.json', 'r') as schema_file:
+    with open("../json/fields.json", "r") as schema_file:
         schema = json.load(schema_file)
-        for field in schema['add-field']:
-            results.append(field['name'])
+        for field in schema["add-field"]:
+            results.append(field["name"])
 
     if results is None or len(results) == 0:
         raise Exception("No fields in fields.json defined")
@@ -128,8 +144,14 @@ def load_solr_fields() -> list[str]:
     return results
 
 
-def hybrid_search(query: str, solr_url: str, model: SentenceTransformer,
-                  text_weight: float = 0.5, vector_weight: float = 0.5, top_k: int = 100) -> list:
+def hybrid_search(
+    query: str,
+    solr_url: str,
+    model: SentenceTransformer,
+    text_weight: float = 0.5,
+    vector_weight: float = 0.5,
+    top_k: int = 100,
+) -> list:
     query_embedding = model.encode(query)
     vector_str = "[" + ",".join(str(x) for x in query_embedding.tolist()) + "]"
 
@@ -140,7 +162,7 @@ def hybrid_search(query: str, solr_url: str, model: SentenceTransformer,
         "fl": "*,score",
         "rows": top_k,
         "defType": "edismax",  # Use edismax for better text search
-        "qf": "name address city email"  # Specify which fields to search in
+        "qf": "name address city email",  # Specify which fields to search in
     }
 
     solr = pysolr.Solr(solr_url)
@@ -148,6 +170,7 @@ def hybrid_search(query: str, solr_url: str, model: SentenceTransformer,
     print(f"Found {len(results.docs)} results with hybrid search")
 
     return results.docs
+
 
 if __name__ == "__main__":
     HYBRID_SEARCH_WITH_SOLR_LTR = False
