@@ -23,8 +23,8 @@ class TestImportEndpoint(unittest.TestCase):
             }
         ]
 
-    @patch("importer.api.solr.add")
-    @patch("importer.api.solr.commit")
+    @patch("solr.importer.api.solr.add")
+    @patch("solr.importer.api.solr.commit")
     def test_import_endpoint_success(self, mock_commit, mock_add):
         response = self.client.post(
             "/import",
