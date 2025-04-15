@@ -2,7 +2,7 @@ import json
 import unittest
 from unittest.mock import patch
 
-from importer.api import app
+from solr.importer.api import app
 
 
 class TestImportEndpoint(unittest.TestCase):
