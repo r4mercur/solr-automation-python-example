@@ -2,6 +2,30 @@ global:
   scrape_interval: 15s
 
 scrape_configs:
-  - job_name: 'solr_import'
+  - job_name: 'solr-instance-1'
     static_configs:
-      - targets: ['host.docker.internal:8000']
+      - targets: ['solr-instance-1:8983']
+    metrics_path: '/solr/admin/metrics'
+    params:
+      wt: ['prometheus']
+
+  - job_name: 'solr-instance-2'
+    static_configs:
+      - targets: ['solr-instance-2:8983']
+    metrics_path: '/solr/admin/metrics'
+    params:
+      wt: ['prometheus']
+
+  #- job_name: 'solr-collections'
+  #  static_configs:
+  #    - targets: ['solr-instance-1:8983', 'solr-instance-2:8983']
+  #  metrics_path: '/solr/admin/metrics'
+  #  params:
+  #    wt: ['prometheus']
+  #    group: ['core', 'collection']
+  #  scrape_interval: 30s
+
+  # if solr-exporter is enabled in docker compose, uncomment the following section
+  #- job_name: 'solr-exporter'
+  #  static_configs:
+  #    - targets: ['solr-exporter:9854']
