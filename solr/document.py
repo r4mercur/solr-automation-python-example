@@ -1,4 +1,5 @@
 import os
+import threading
 import time
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from typing import List
@@ -9,6 +10,10 @@ from dotenv import load_dotenv
 from faker.proxy import Faker
 from prometheus_client import Counter, Gauge, start_http_server, REGISTRY
 from pydantic import BaseModel, EmailStr, Field, ValidationError
+
+_client_counter = threading.Lock()
+_current_client_index = 0
+turn_on_document_print = False  # Set to True to print each generated document
 
 
 class EmailValidator(BaseModel):
@@ -61,7 +66,15 @@ def main() -> None:
     collection_name = os.getenv("SOLR_COLLECTION")
     # start monitoring
     start_http_server(8000)
-    create_documents(solr_url, collection_name, 100, 10)
+    create_documents(solr_url, collection_name, 1000000, 5000)
+
+
+def get_next_client_index(num_clients: int) -> int:
+    global _current_client_index
+    with _client_counter:
+        index = _current_client_index
+        _current_client_index = (_current_client_index + 1) % num_clients
+        return index
 
 
 def pre_generate_random_data(chunk_size: int) -> tuple:
@@ -71,17 +84,33 @@ def pre_generate_random_data(chunk_size: int) -> tuple:
 
 
 def add_documents_to_solr(
-    solr_clients: list, documents: list, batch_size: int = 10_000
+    solr_clients: list, documents: list, start_doc_id: int, batch_size: int = 10_000
 ) -> None:
     num_clients = len(solr_clients)
+
     for index in range(0, len(documents), batch_size):
-        client_index = (index // batch_size) % num_clients
-        solr_clients[client_index].add(documents[index : index + batch_size])
-        DOCUMENTS_ADDED.labels(status="added").inc(
-            len(documents[index : index + batch_size])
-        )
+        client_index = get_next_client_index(num_clients)
+
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                solr_clients[client_index].add(documents[index : index + batch_size])
+                DOCUMENTS_ADDED.labels(status="added").inc(
+                    len(documents[index : index + batch_size])
+                )
+                break
+            except (pysolr.SolrError, ConnectionError) as e:
+                if attempt == max_retries - 1:  # Letzter Versuch
+                    print(f"Failed to add documents after {max_retries} attempts: {e}")
+                    raise
+                else:
+                    print(f"Timeout attempt {attempt + 1}, retrying...")
+                    time.sleep(2**attempt)
+
+        global_start = start_doc_id + index
+        global_end = start_doc_id + min(index + batch_size, len(documents))
         print(
-            f"Added documents {index} to {index + batch_size} to Solr using client {client_index}"
+            f"Added documents {global_start} to {global_end} to Solr using client {client_index}"
         )
 
 
@@ -106,7 +135,9 @@ def generate_documents(start_index: int, chunk_size: int) -> list:
             )
             documents.append(document.model_dump())
             DOCUMENTS_PROCESSED.labels(status="processed").inc()
-            print(f"Generated document {id_}:{documents[-1]}")
+
+            if turn_on_document_print:
+                print(f"Generated document {id_}:{documents[-1]}")
         except ValidationError as e:
             print(f"Validation error for document {id_}: {e}")
 
@@ -114,7 +145,7 @@ def generate_documents(start_index: int, chunk_size: int) -> list:
 
 
 def get_solr_client(url: str, collection_name: str) -> pysolr.Solr:
-    return pysolr.Solr(url + "/" + collection_name, always_commit=True)
+    return pysolr.Solr(url + "/" + collection_name, always_commit=True, timeout=300)
 
 
 def create_documents(
@@ -135,16 +166,19 @@ def create_documents(
     ) as threads_executors:
 
         tasks = []
-        futures = [
-            process_executors.submit(generate_documents, index, chunk_size)
-            for index in range(1, number_of_documents + 1, chunk_size)
-        ]
+        futures = []
+        futures_to_start_index = {}
+        for index in range(1, number_of_documents + 1, chunk_size):
+            future = process_executors.submit(generate_documents, index, chunk_size)
+            futures_to_start_index[future] = index
+            futures.append(future)
 
         for future in as_completed(futures):
             documents = future.result()
+            start_doc_id = futures_to_start_index[future]
             tasks.append(
                 threads_executors.submit(
-                    add_documents_to_solr, clients, documents, 10_000
+                    add_documents_to_solr, clients, documents, start_doc_id, 25_000
                 )
             )
 
