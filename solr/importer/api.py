@@ -5,13 +5,14 @@ from flask import Flask, request, jsonify
 from pydantic import ValidationError
 
 from solr.document import SolrImportPayload, SolrDocument, get_solr_client
+from solr.util import with_env
 
 app = Flask(__name__)
-solr = get_solr_client(os.getenv("SOLR_URL"), os.getenv("SOLR_COLLECTION"))
-
 
 @app.route("/import", methods=["POST"])
 def import_user():
+    client = get_solr_client(os.getenv("SOLR_URL"), os.getenv("SOLR_COLLECTION"))
+    
     try:
         raw_data = request.get_json()
         payload = validate_payload(raw_data)
@@ -19,8 +20,8 @@ def import_user():
         solr_documents = [doc.model_dump() for doc in payload.documents]
         json_data = json.dumps(solr_documents).encode("utf-8")
 
-        solr.add(json_data)
-        solr.commit()
+        client.add(json_data)
+        client.commit()
         return jsonify({"status": "OK"}), 200
 
     except ValidationError as e:
@@ -40,5 +41,10 @@ def validate_payload(raw_data):
     return payload
 
 
-if __name__ == "__main__":
+@with_env(required_variables=["SOLR_URL", "SOLR_COLLECTION"])
+def main():
     app.run(port=5000, debug=True)
+
+
+if __name__ == "__main__":
+    main()
