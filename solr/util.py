@@ -1,13 +1,14 @@
 import functools
 import os
+from typing import List, Optional
 from dotenv import load_dotenv
 
-def with_env(required_variables: list[str] | None = None):
+def with_env(required_variables: Optional[List[str]] = None):
     """
     Decorator to ensure that environment variables are set before running a function.
 
     Args:
-        required_variables (list[str] | None): A list of environment variable names that are required.
+        required_variables (Optional[List[str]]): A list of environment variable names that are required.
     """
 
     def decorator(func):
