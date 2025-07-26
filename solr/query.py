@@ -1,10 +1,12 @@
 import os
 
-import pysolr
 from dotenv import load_dotenv
 
 from solr.security import print_ascii_title
+from solr.document import get_solr_client
 
+
+solr = get_solr_client(os.getenv("SOLR_URL"), os.getenv("SOLR_COLLECTION"))
 
 def main() -> None:
     load_dotenv()
@@ -14,18 +16,17 @@ def main() -> None:
     print_ascii_title("SOLR QUERY")
 
     print("Querying without filter...")
-    query_solr_collection(solr_url, collection_name)
+    query_solr_collection()
 
     print("Querying with filter...")
-    query_solr_with_filter(solr_url, collection_name, "Robert Stevens")
+    query_solr_with_filter("Robert Stevens")
 
     print("Querying document count...")
-    document_count = query_document_count(solr_url, collection_name)
+    document_count = query_document_count()
     print(f"The collection {collection_name} has {document_count} documents.")
 
 
-def query_solr_collection(solr_url: str, collection_name: str) -> str:
-    solr = pysolr.Solr(solr_url + "/" + collection_name, always_commit=True)
+def query_solr_collection() -> str:
     results = solr.search("*:*", **{"q.op": "OR", "indent": "true", "useParams": ""})
 
     for result in results:
@@ -34,8 +35,7 @@ def query_solr_collection(solr_url: str, collection_name: str) -> str:
     return results
 
 
-def query_solr_with_filter(solr_url: str, collection_name: str, name: str) -> str:
-    solr = pysolr.Solr(solr_url + "/" + collection_name, always_commit=True)
+def query_solr_with_filter(name: str) -> str:
     query = f'name:"{name}"'
     results = solr.search(query, **{"q.op": "OR", "indent": "true", "useParams": ""})
 
@@ -45,16 +45,12 @@ def query_solr_with_filter(solr_url: str, collection_name: str, name: str) -> st
     return results
 
 
-def query_document_count(solr_url: str, collection_name: str) -> int:
-    solr = pysolr.Solr(solr_url + "/" + collection_name, always_commit=True)
+def query_document_count() -> int:
     results = solr.search("*:*", rows=0)
     return results.hits
 
 
-def query_by_age_range(
-        solr_url: str, collection_name: str, min_age: int, max_age: int
-) -> list[str]:
-    solr = pysolr.Solr(solr_url + "/" + collection_name, always_commit=True)
+def query_by_age_range(min_age: int, max_age: int) -> list[str]:
     results = solr.search(
         f"age:[{min_age} TO {max_age}]", **{"q.op": "AND", "indent": "true"}
     )
@@ -62,10 +58,7 @@ def query_by_age_range(
     return [str(result) for result in results]
 
 
-def query_by_gender_and_city(
-        solr_url: str, collection_name: str, gender: str, city: str
-) -> list[str]:
-    solr = pysolr.Solr(solr_url + "/" + collection_name, always_commit=True)
+def query_by_gender_and_city(gender: str, city: str) -> list[str]:
     results = solr.search(
         f"gender:{gender} AND city:{city}",
         **{"q.op": "AND"},
@@ -78,10 +71,7 @@ def query_by_gender_and_city(
     return [str(result) for result in results]
 
 
-def query_with_boosting(
-        solr_url: str, collection_name: str, search_term: str
-) -> list[str]:
-    solr = pysolr.Solr(solr_url + "/" + collection_name, always_commit=True)
+def query_with_boosting(search_term: str) -> list[str]:
     results = solr.search(
         f"name:{search_term}^2 OR email:{search_term}",
         **{"q.op": "OR", "indent": "true"},

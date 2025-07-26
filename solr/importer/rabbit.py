@@ -2,7 +2,7 @@ import json
 
 import pika
 
-from solr.util import get_solr_client
+from solr.document import get_solr_client
 
 solr = get_solr_client()
 rabbit_url = "amqp://guest:guest@localhost:5672/"

@@ -5,7 +5,7 @@ import pysolr
 from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
 
-from document import generate_documents
+from document import generate_documents, get_solr_client
 
 SEMANTIC_WITH_PRETRAINED_MODEL = False
 HYBRID_SEARCH_WITH_SOLR_LTR = False
@@ -17,7 +17,7 @@ def main() -> None:
     collection_name = os.getenv("SOLR_COLLECTION")
 
     solr_url_with_collection = f"{solr_url}/{collection_name}"
-    solr = pysolr.Solr(solr_url_with_collection)
+    solr = get_solr_client(solr_url, collection_name)
 
     if SEMANTIC_WITH_PRETRAINED_MODEL:
         # Choosen ML-Models from https://huggingface.co/models
@@ -122,7 +122,7 @@ def semantic_search(
         "rows": top_k,
     }
 
-    solr = pysolr.Solr(solr_url)
+    solr = get_solr_client(solr_url, "")
     results = solr.search(**params)
 
     print(
@@ -165,7 +165,7 @@ def hybrid_search(
         "qf": "name address city email",  # Specify which fields to search in
     }
 
-    solr = pysolr.Solr(solr_url)
+    solr = get_solr_client(solr_url, "")
     results = solr.search(**params)
     print(f"Found {len(results.docs)} results with hybrid search")
 

@@ -1,13 +1,13 @@
 import json
+import os
 
 from flask import Flask, request, jsonify
 from pydantic import ValidationError
 
-from solr.document import SolrImportPayload, SolrDocument
-from solr.util import get_solr_client
+from solr.document import SolrImportPayload, SolrDocument, get_solr_client
 
 app = Flask(__name__)
-solr = get_solr_client()
+solr = get_solr_client(os.getenv("SOLR_URL"), os.getenv("SOLR_COLLECTION"))
 
 
 @app.route("/import", methods=["POST"])
