@@ -1,8 +1,7 @@
 import os
 
-from dotenv import load_dotenv
-
-from document import get_solr_client
+from .util import with_env
+from .document import get_solr_client
 
 
 def delete_all_documents(solr_url: str, collection_name: str) -> None:
@@ -16,9 +15,8 @@ def delete_all_documents(solr_url: str, collection_name: str) -> None:
         print(f"Error when trying to delete documents: {e}")
 
 
+@with_env(required_variables=["SOLR_URL", "SOLR_COLLECTION"])
 def main() -> None:
-    load_dotenv()
-
     solr_url = os.getenv("SOLR_URL")
     collection_name = os.getenv("SOLR_COLLECTION")
 

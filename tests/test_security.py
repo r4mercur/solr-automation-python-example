@@ -3,21 +3,21 @@ import time
 import unittest
 import requests
 
-from dotenv import load_dotenv
 from requests.auth import HTTPBasicAuth
 from testcontainers.compose import DockerCompose
 
 from solr import security_main_for_test
+from solr.util import with_env
 
 
 class TestSecuritySolrCloud(unittest.TestCase):
     @classmethod
+    @with_env(required_variables=["SOLR_URL"])
     def setUp(cls):
         cls.compose = DockerCompose(os.path.dirname(__file__),
                                     compose_file_name='docker-compose.test.yml')
         cls.compose.start()
 
-        load_dotenv()
         cls.solr_url = os.getenv('SOLR_URL')
         time.sleep(3)
 

@@ -1,88 +1,12 @@
 import json
 import os
 
-import pysolr
-from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
-
 from document import generate_documents, get_solr_client
+from .util import with_env
 
 SEMANTIC_WITH_PRETRAINED_MODEL = False
 HYBRID_SEARCH_WITH_SOLR_LTR = False
-
-
-def main() -> None:
-    load_dotenv()
-    solr_url = os.getenv("SOLR_URL")
-    collection_name = os.getenv("SOLR_COLLECTION")
-
-    solr_url_with_collection = f"{solr_url}/{collection_name}"
-    solr = get_solr_client(solr_url, collection_name)
-
-    if SEMANTIC_WITH_PRETRAINED_MODEL:
-        # Choosen ML-Models from https://huggingface.co/models
-        # Good model for our dating app case: https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2
-        model = SentenceTransformer("all-MiniLM-L6-v2")
-        # This model needs a high performance GPU: https://huggingface.co/deepseek-ai/DeepSeek-R1/discussions & maybe is not the best choice for our case
-        # (ML-Model catgory: Text-Gereration)
-        # model = AutoModelForCausalLM.from_pretrained("deepseek-ai/DeepSeek-R1", trust_remote_code=True)
-
-        documents = generate_documents(0, 1000)
-        documents_with_embeddings = [
-            index_document_with_embeddings(doc, model) for doc in documents
-        ]
-
-        solr.add(documents_with_embeddings)
-        solr.commit()
-
-        response = solr.search("*:*", rows=5)
-        print(f"Total documents in Solr: {response.hits}")
-        print(
-            "Sample document:",
-            json.dumps(
-                response.docs[0] if response.docs else "No documents found", indent=2
-            ),
-        )
-
-        # fyi: find similar documents based on this query sentence
-        queries = load_queries_from_json("../json/sentences.json")
-        sentences = queries["sentences"]
-        query = sentences[0]["content"]
-        results = semantic_search(query, solr_url_with_collection, model)
-        print(
-            "Sample documents with semantic search (vector based):",
-            json.dumps(results, indent=2),
-        )
-
-    if HYBRID_SEARCH_WITH_SOLR_LTR:
-        model = SentenceTransformer("all-MiniLM-L6-v2")
-
-        # Generate and index documents if none exist
-        response = solr.search("*:*", rows=1)
-        if response.hits == 0:
-            print("No documents found in index. Generating and indexing documents...")
-            documents = generate_documents(0, 1000)
-            documents_with_embeddings = [
-                index_document_with_embeddings(doc, model) for doc in documents
-            ]
-            solr.add(documents_with_embeddings)
-            solr.commit()
-            print(f"Indexed {len(documents)} documents with embeddings")
-
-        # Perform hybrid search
-        query = "looking for someone who likes hiking and outdoor activities"
-        results = hybrid_search(
-            query=query,
-            solr_url=solr_url_with_collection,
-            model=model,
-            text_weight=0.4,
-            vector_weight=0.6,
-            top_k=10,
-        )
-
-        print(f"Top results for query '{query}':")
-        for i, doc in enumerate(results[:3], 1):
-            print(f"{i}. {doc.get('title', 'No title')} - Score: {doc.get('score', 0)}")
 
 
 def load_queries_from_json(file_path: str) -> dict:
@@ -170,6 +94,80 @@ def hybrid_search(
     print(f"Found {len(results.docs)} results with hybrid search")
 
     return results.docs
+
+
+@with_env(required_variables=["SOLR_URL", "SOLR_COLLECTION"])
+def main() -> None:
+    solr_url = os.getenv("SOLR_URL")
+    collection_name = os.getenv("SOLR_COLLECTION")
+
+    solr_url_with_collection = f"{solr_url}/{collection_name}"
+    solr = get_solr_client(solr_url, collection_name)
+
+    if SEMANTIC_WITH_PRETRAINED_MODEL:
+        # Choosen ML-Models from https://huggingface.co/models
+        # Good model for our dating app case: https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2
+        model = SentenceTransformer("all-MiniLM-L6-v2")
+        # This model needs a high performance GPU: https://huggingface.co/deepseek-ai/DeepSeek-R1/discussions & maybe is not the best choice for our case
+        # (ML-Model catgory: Text-Gereration)
+        # model = AutoModelForCausalLM.from_pretrained("deepseek-ai/DeepSeek-R1", trust_remote_code=True)
+
+        documents = generate_documents(0, 1000)
+        documents_with_embeddings = [
+            index_document_with_embeddings(doc, model) for doc in documents
+        ]
+
+        solr.add(documents_with_embeddings)
+        solr.commit()
+
+        response = solr.search("*:*", rows=5)
+        print(f"Total documents in Solr: {response.hits}")
+        print(
+            "Sample document:",
+            json.dumps(
+                response.docs[0] if response.docs else "No documents found", indent=2
+            ),
+        )
+
+        # fyi: find similar documents based on this query sentence
+        queries = load_queries_from_json("../json/sentences.json")
+        sentences = queries["sentences"]
+        query = sentences[0]["content"]
+        results = semantic_search(query, solr_url_with_collection, model)
+        print(
+            "Sample documents with semantic search (vector based):",
+            json.dumps(results, indent=2),
+        )
+
+    if HYBRID_SEARCH_WITH_SOLR_LTR:
+        model = SentenceTransformer("all-MiniLM-L6-v2")
+
+        # Generate and index documents if none exist
+        response = solr.search("*:*", rows=1)
+        if response.hits == 0:
+            print("No documents found in index. Generating and indexing documents...")
+            documents = generate_documents(0, 1000)
+            documents_with_embeddings = [
+                index_document_with_embeddings(doc, model) for doc in documents
+            ]
+            solr.add(documents_with_embeddings)
+            solr.commit()
+            print(f"Indexed {len(documents)} documents with embeddings")
+
+        # Perform hybrid search
+        query = "looking for someone who likes hiking and outdoor activities"
+        results = hybrid_search(
+            query=query,
+            solr_url=solr_url_with_collection,
+            model=model,
+            text_weight=0.4,
+            vector_weight=0.6,
+            top_k=10,
+        )
+
+        print(f"Top results for query '{query}':")
+        for i, doc in enumerate(results[:3], 1):
+            print(f"{i}. {doc.get('title', 'No title')} - Score: {doc.get('score', 0)}")
 
 
 if __name__ == "__main__":

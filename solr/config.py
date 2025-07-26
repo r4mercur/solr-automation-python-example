@@ -1,18 +1,8 @@
 import os
 import requests
 
-from dotenv import load_dotenv
-
-from schema import reload_solr_collection
-
-
-def main () -> None:
-    load_dotenv()
-
-    solr_url = os.getenv('SOLR_URL')
-    collection_name = os.getenv('SOLR_COLLECTION')
-
-    configure_ltr_plugin(solr_url, collection_name)
+from .util import with_env
+from .schema import reload_solr_collection
 
 
 def configure_ltr_plugin(solr_url: str, collection_name: str) -> None:
@@ -50,6 +40,14 @@ def configure_ltr_plugin(solr_url: str, collection_name: str) -> None:
             print(f"Failed to configure LTR plugin: {response.status_code}")
 
     reload_solr_collection(solr_url, collection_name)
+
+
+@with_env(required_variables=["SOLR_URL", "SOLR_COLLECTION"])
+def main () -> None:
+    solr_url = os.getenv('SOLR_URL')
+    collection_name = os.getenv('SOLR_COLLECTION')
+
+    configure_ltr_plugin(solr_url, collection_name)
 
 
 if __name__ == '__main__':

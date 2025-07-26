@@ -6,21 +6,21 @@ import unittest
 import uuid
 
 import pika
-import pysolr
-from dotenv import load_dotenv
+import pysolr 
 from testcontainers.compose import DockerCompose
 
 from solr import create_solr_collection, update_solr_schema
+from solr.util import with_env
 
 
 class TestSolrRabbitIntegration(unittest.TestCase):
+    @with_env(required_variables=["SOLR_URL", "SOLR_COLLECTION", "RABBITMQ_URL"])
     def setUp(self):
         self.compose = DockerCompose(
             os.path.dirname(__file__), compose_file_name="docker-compose.test.yml"
         )
         self.compose.start()
 
-        load_dotenv()
         self.solr_url = os.getenv("SOLR_URL")
         self.solr_collection = os.getenv("SOLR_COLLECTION")
         time.sleep(15)

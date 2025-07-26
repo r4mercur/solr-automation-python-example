@@ -1,14 +1,7 @@
 import os
 
 import requests
-from dotenv import load_dotenv
-
-
-def main() -> None:
-    load_dotenv()
-    solr_url = os.getenv("SOLR_URL")
-    collection_name = os.getenv("SOLR_COLLECTION")
-    create_solr_collection(solr_url, collection_name)
+from .util import with_env
 
 
 def create_solr_collection(
@@ -20,6 +13,13 @@ def create_solr_collection(
         print(f"Collection {temp_collection_name} created successfully.")
     else:
         print(f"Failed to create collection {temp_collection_name}: {response.text}")
+
+
+@with_env(required_variables=["SOLR_URL", "SOLR_COLLECTION"])
+def main() -> None:
+    solr_url = os.getenv("SOLR_URL")
+    collection_name = os.getenv("SOLR_COLLECTION")
+    create_solr_collection(solr_url, collection_name)
 
 
 if __name__ == "__main__":

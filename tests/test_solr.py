@@ -3,18 +3,18 @@ import requests
 import json
 import os
 import time
-from dotenv import load_dotenv
 from testcontainers.compose import DockerCompose
+from solr.util import with_env
 
 class TestSolrIntegration(unittest.TestCase):
 
     @classmethod
+    @with_env(required_variables=["SOLR_URL", "SOLR_COLLECTION"])
     def setUpClass(cls):
         cls.compose = DockerCompose(os.path.dirname(__file__),
                                     compose_file_name='docker-compose.test.yml')
         cls.compose.start()
 
-        load_dotenv()
         cls.solr_url = 'http://localhost:8983/solr'
         cls.collection_name = 'test_collection'
 

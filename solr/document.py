@@ -6,14 +6,14 @@ from typing import List
 
 import numpy as np
 import pysolr
-from dotenv import load_dotenv
+from .util import with_env
 from faker.proxy import Faker
 from prometheus_client import Counter, Gauge, start_http_server, REGISTRY
 from pydantic import BaseModel, EmailStr, Field, ValidationError
 
 _client_counter = threading.Lock()
 _current_client_index = 0
-turn_on_document_print = False  # Set to True to print each generated document
+turn_on_document_print = False
 
 
 class EmailValidator(BaseModel):
@@ -60,14 +60,9 @@ if "process_time" not in REGISTRY._names_to_collectors:
     PROCESS_TIME = Gauge("process_time", "Time taken to process documents")
 
 
-def main() -> None:
-    load_dotenv()
-    solr_url = os.getenv("SOLR_URL")
-    collection_name = os.getenv("SOLR_COLLECTION")
-    # start monitoring
-    start_http_server(8000)
-    create_documents(solr_url, collection_name, 1000000, 5000)
-
+"""
+ Here methods to create Solr documents, add them to Solr, and manage Solr clients.
+"""
 
 def get_next_client_index(num_clients: int) -> int:
     global _current_client_index
@@ -188,6 +183,15 @@ def create_documents(
     end_time = time.time()
     PROCESS_TIME.set(end_time - start_time)
     print(f"Documents added successfully in {end_time - start_time} seconds.")
+
+
+@with_env(required_variables=["SOLR_URL", "SOLR_COLLECTION"])
+def main() -> None:
+    solr_url = os.getenv("SOLR_URL")
+    collection_name = os.getenv("SOLR_COLLECTION")
+    # start monitoring
+    start_http_server(8000)
+    create_documents(solr_url, collection_name, 1000000, 5000)
 
 
 if __name__ == "__main__":

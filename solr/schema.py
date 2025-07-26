@@ -2,20 +2,8 @@ import os
 import requests
 import json
 
-from dotenv import load_dotenv
+from .util import with_env
 
-
-def main() -> None:
-    load_dotenv()
-    solr_url = os.getenv('SOLR_URL')
-    collection_name = os.getenv('SOLR_COLLECTION')
-
-    schema_file_path = os.path.join(os.path.dirname(__file__), '../json/fields.json')
-    with open(schema_file_path, 'r') as schema_file:
-        schema = json.load(schema_file)
-
-    update_solr_schema(solr_url, collection_name, schema)
-    reload_solr_collection(solr_url, collection_name)
 
 def update_solr_schema(temp_solr_url: str, temp_collection_name: str, temp_schema: dict) -> None:
     schema_url = f'{temp_solr_url}/{temp_collection_name}/schema'
@@ -87,6 +75,20 @@ def reload_solr_collection(temp_solr_url: str, temp_collection_name: str) -> Non
         print(f'Collection {temp_collection_name} reloaded successfully.')
     else:
         print(f'Failed to reload collection {temp_collection_name}: {response.text}')
+
+
+
+@with_env(required_variables=["SOLR_URL", "SOLR_COLLECTION"])
+def main() -> None:
+    solr_url = os.getenv('SOLR_URL')
+    collection_name = os.getenv('SOLR_COLLECTION')
+
+    schema_file_path = os.path.join(os.path.dirname(__file__), '../json/fields.json')
+    with open(schema_file_path, 'r') as schema_file:
+        schema = json.load(schema_file)
+
+    update_solr_schema(solr_url, collection_name, schema)
+    reload_solr_collection(solr_url, collection_name)
 
 
 if __name__ == '__main__':

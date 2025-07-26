@@ -3,22 +3,22 @@ import os
 import json
 import requests
 import time
-from dotenv import load_dotenv
 from testcontainers.compose import DockerCompose
 
 from solr.core import create_solr_collection
 from solr.document import create_documents
 from solr.schema import update_solr_schema, reload_solr_collection
+from solr.util import with_env
 
 
 class TestImplementationSolr(unittest.TestCase):
     @classmethod
+    @with_env(required_variables=["SOLR_URL", "SOLR_COLLECTION"])
     def setUpClass(cls):
         cls.compose = DockerCompose(os.path.dirname(__file__),
                                     compose_file_name='docker-compose.test.yml')
         cls.compose.start()
 
-        load_dotenv()
         cls.solr_url = os.getenv('SOLR_URL')
         cls.collection_name = os.getenv('SOLR_COLLECTION')
         cls.wait_for_solr_and_init_core(cls.solr_url, cls.collection_name)
