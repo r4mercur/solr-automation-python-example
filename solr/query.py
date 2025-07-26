@@ -50,8 +50,8 @@ def query_by_gender_and_city(client: pysolr.Solr, gender: str, city: str) -> lis
     return [str(result) for result in results]
 
 
-def query_with_boosting(search_term: str) -> list[str]:
-    results = solr.search(
+def query_with_boosting(client: pysolr.Solr, search_term: str) -> list[str]:
+    results = client.search(
         f"name:{search_term}^2 OR email:{search_term}",
         **{"q.op": "OR", "indent": "true"},
     )
