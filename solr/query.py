@@ -6,13 +6,12 @@ from solr.security import print_ascii_title
 from solr.document import get_solr_client
 
 
-solr = get_solr_client(os.getenv("SOLR_URL"), os.getenv("SOLR_COLLECTION"))
+load_dotenv()
+solr_url = os.getenv("SOLR_URL")
+collection_name = os.getenv("SOLR_COLLECTION")
+solr = get_solr_client(solr_url, collection_name)
 
 def main() -> None:
-    load_dotenv()
-    solr_url = os.getenv("SOLR_URL")
-    collection_name = os.getenv("SOLR_COLLECTION")
-
     print_ascii_title("SOLR QUERY")
 
     print("Querying without filter...")
