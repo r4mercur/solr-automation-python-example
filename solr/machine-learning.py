@@ -1,7 +1,9 @@
 import json
 import os
+from argparse import ArgumentParser, Namespace
 
 from sentence_transformers import SentenceTransformer
+
 from document import generate_documents, get_solr_client
 from .util import with_env
 
@@ -170,7 +172,24 @@ def main() -> None:
             print(f"{i}. {doc.get('title', 'No title')} - Score: {doc.get('score', 0)}")
 
 
+def parse_args() -> Namespace:
+    parser = ArgumentParser()
+    parser.add_argument(
+        "--hybrid",
+        action="store_true",
+        help="Enable hybrid search with Solr LTR",
+    )
+    parser.add_argument(
+        "--semantic",
+        action="store_true",
+        help="Enable semantic search with a pretrained model",
+    )
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    HYBRID_SEARCH_WITH_SOLR_LTR = False
-    SEMANTIC_WITH_PRETRAINED_MODEL = True
+    args = parse_args()
+    HYBRID_SEARCH_WITH_SOLR_LTR = args.hybrid
+    SEMANTIC_WITH_PRETRAINED_MODEL = args.semantic
+
     main()
