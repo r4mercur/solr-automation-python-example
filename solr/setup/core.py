@@ -1,11 +1,15 @@
 import os
 
 import requests
-from .util import with_env
+
+from solr.util import with_env
 
 
 def create_solr_collection(
-        temp_solr_url: str, temp_collection_name: str, number_of_shards: int = 4, replication_factor: int = 2
+    temp_solr_url: str,
+    temp_collection_name: str,
+    number_of_shards: int = 4,
+    replication_factor: int = 2,
 ) -> None:
     create_collection_url = f"{temp_solr_url}/admin/collections?action=CREATE&name={temp_collection_name}&numShards={number_of_shards}&replicationFactor={replication_factor}"
     response = requests.get(create_collection_url)

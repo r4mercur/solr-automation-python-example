@@ -1,9 +1,7 @@
-import core
-import schema
-import document
-import query
+from solr.setup import core, schema
+from solr.usage import document, query
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     core.main()
     schema.main()
     document.main()

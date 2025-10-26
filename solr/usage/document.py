@@ -6,14 +6,26 @@ from typing import List
 
 import numpy as np
 import pysolr
-from .util import with_env
 from faker.proxy import Faker
-from prometheus_client import Counter, Gauge, start_http_server, REGISTRY
-from pydantic import BaseModel, EmailStr, Field, ValidationError
+from prometheus_client import Counter, Gauge, start_http_server
+from pydantic import BaseModel, EmailStr, Field, ValidationError, ConfigDict
+
+from solr.util import with_env, get_or_create_metric
 
 _client_counter = threading.Lock()
 _current_client_index = 0
 turn_on_document_print = False
+
+# Define Prometheus metrics
+DOCUMENTS_PROCESSED = get_or_create_metric(
+    "documents_processed", Counter, "Number of documents processed", ["status"]
+)
+DOCUMENTS_ADDED = get_or_create_metric(
+    "documents_added", Counter, "Number of documents added", ["status"]
+)
+PROCESS_TIME = get_or_create_metric(
+    "process_time", Gauge, "Time taken to process documents"
+)
 
 
 class EmailValidator(BaseModel):
@@ -30,9 +42,7 @@ class SolrDocument(BaseModel):
     city: str
     state: str
     search_for: str
-
-    class Config:
-        extra = "allow"  # Allow extra fields in the input data
+    model_config = ConfigDict(extra="allow")
 
     @staticmethod
     def cast_to_email_str(value: str) -> EmailStr:
@@ -47,22 +57,10 @@ class SolrImportPayload(BaseModel):
     documents: List[SolrDocument]
 
 
-# Check if the metrics are already registered
-if "documents_processed" not in REGISTRY._names_to_collectors:
-    DOCUMENTS_PROCESSED = Counter(
-        "documents_processed", "Number of documents processed", ["status"]
-    )
-if "documents_added" not in REGISTRY._names_to_collectors:
-    DOCUMENTS_ADDED = Counter(
-        "documents_added", "Number of documents added", ["status"]
-    )
-if "process_time" not in REGISTRY._names_to_collectors:
-    PROCESS_TIME = Gauge("process_time", "Time taken to process documents")
-
-
 """
  Here methods to create Solr documents, add them to Solr, and manage Solr clients.
 """
+
 
 def get_next_client_index(num_clients: int) -> int:
     global _current_client_index

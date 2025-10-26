@@ -1,9 +1,11 @@
 import os
+
 import pysolr
 
-from .security import print_ascii_title
-from .document import get_solr_client
-from .util import with_env
+from solr.setup.security import print_ascii_title
+from solr.usage.document import get_solr_client
+from solr.util import with_env
+
 
 def query_solr_collection(client: pysolr.Solr) -> str:
     results = client.search("*:*", **{"q.op": "OR", "indent": "true", "useParams": ""})

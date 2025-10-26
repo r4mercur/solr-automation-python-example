@@ -4,8 +4,8 @@ from argparse import ArgumentParser, Namespace
 
 from sentence_transformers import SentenceTransformer
 
-from document import generate_documents, get_solr_client
-from .util import with_env
+from solr.usage.document import generate_documents, get_solr_client
+from solr.util import with_env
 
 SEMANTIC_WITH_PRETRAINED_MODEL = False
 HYBRID_SEARCH_WITH_SOLR_LTR = False
@@ -59,7 +59,7 @@ def semantic_search(
 
 def load_solr_fields() -> list[str]:
     results = []
-    with open("../json/fields.json", "r") as schema_file:
+    with open("../../json/fields.json", "r") as schema_file:
         schema = json.load(schema_file)
         for field in schema["add-field"]:
             results.append(field["name"])
@@ -132,7 +132,7 @@ def main() -> None:
         )
 
         # fyi: find similar documents based on this query sentence
-        queries = load_queries_from_json("../json/sentences.json")
+        queries = load_queries_from_json("../../json/sentences.json")
         sentences = queries["sentences"]
         query = sentences[0]["content"]
         results = semantic_search(query, solr_url_with_collection, model)

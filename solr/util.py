@@ -1,7 +1,10 @@
 import functools
 import os
 from typing import List, Optional
+
 from dotenv import load_dotenv
+from prometheus_client import REGISTRY
+
 
 def with_env(required_variables: Optional[List[str]] = None):
     """
@@ -25,5 +28,18 @@ def with_env(required_variables: Optional[List[str]] = None):
                         f"Missing required environment variables: {', '.join(missing_variables)}"
                     )
             return func(*args, **kwargs)
+
         return wrapper
+
     return decorator
+
+
+def get_or_create_metric(name: str, metric_class, *args, **kwargs):
+    """Get existing metric or create new one if it doesn't exist."""
+    try:
+        existing = REGISTRY._names_to_collectors.get(name)
+        if existing:
+            return existing
+    except:
+        pass
+    return metric_class(name, *args, **kwargs)

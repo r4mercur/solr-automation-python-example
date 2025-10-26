@@ -1,8 +1,9 @@
 import os
+
 import requests
 
-from .util import with_env
-from .schema import reload_solr_collection
+from solr.setup.schema import reload_solr_collection
+from solr.util import with_env
 
 
 def configure_ltr_plugin(solr_url: str, collection_name: str) -> None:
@@ -11,7 +12,7 @@ def configure_ltr_plugin(solr_url: str, collection_name: str) -> None:
     query_parser_config = {
         "add-queryparser": {
             "name": "ltr",
-            "class": "org.apache.solr.ltr.search.LTRQParserPlugin"
+            "class": "org.apache.solr.ltr.search.LTRQParserPlugin",
         }
     }
     cache_config = {
@@ -21,14 +22,14 @@ def configure_ltr_plugin(solr_url: str, collection_name: str) -> None:
             "size": 4096,
             "initialSize": 2048,
             "autowarmCount": 4096,
-            "regenerator": "solr.search.NoOpRegenerator"
+            "regenerator": "solr.search.NoOpRegenerator",
         }
     }
     features_transformer_config = {
         "add-transformer": {
             "name": "features",
             "class": "org.apache.solr.ltr.response.transform.LTRFeatureLoggerTransformerFactory",
-            "fvCacheName": "QUERY_DOC_FV"
+            "fvCacheName": "QUERY_DOC_FV",
         }
     }
 
@@ -43,12 +44,12 @@ def configure_ltr_plugin(solr_url: str, collection_name: str) -> None:
 
 
 @with_env(required_variables=["SOLR_URL", "SOLR_COLLECTION"])
-def main () -> None:
-    solr_url = os.getenv('SOLR_URL')
-    collection_name = os.getenv('SOLR_COLLECTION')
+def main() -> None:
+    solr_url = os.getenv("SOLR_URL")
+    collection_name = os.getenv("SOLR_COLLECTION")
 
     configure_ltr_plugin(solr_url, collection_name)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

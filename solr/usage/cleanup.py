@@ -1,7 +1,7 @@
 import os
 
-from .util import with_env
-from .document import get_solr_client
+from solr.usage.document import get_solr_client
+from solr.util import with_env
 
 
 def delete_all_documents(solr_url: str, collection_name: str) -> None:
