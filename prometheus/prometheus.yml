@@ -29,8 +29,3 @@ scrape_configs:
   #    wt: ['prometheus']
   #    group: ['core', 'collection']
   #  scrape_interval: 30s
-
-  # if solr-exporter is enabled in docker compose, uncomment the following section
-  #- job_name: 'solr-exporter'
-  #  static_configs:
-  #    - targets: ['solr-exporter:9854']

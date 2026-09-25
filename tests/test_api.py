@@ -1,7 +1,7 @@
 import json
+import os
 import unittest
 from unittest.mock import patch, MagicMock
-import os
 
 from solr.importer.api import app
 
@@ -37,7 +37,7 @@ class TestImportEndpoint(unittest.TestCase):
         )
 
         mock_get_solr_client.assert_called_once_with("http://localhost:8983/solr", "test_collection")
-        mock_solr_client.add.assert_called_once()
+        mock_solr_client.add.assert_called_once_with(self.test_data)
         mock_solr_client.commit.assert_called_once()
 
         self.assertEqual(response.status_code, 200)

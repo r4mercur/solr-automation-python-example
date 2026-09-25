@@ -1,28 +1,49 @@
-import os
+import logging
 
 import requests
 
-from solr.util import with_env
+from solr.util import HTTP_TIMEOUT, check_response, require_env, setup_logging
+
+logger = logging.getLogger(__name__)
+
+
+def collection_exists(solr_url: str, collection_name: str) -> bool:
+    response = requests.get(
+        f"{solr_url}/admin/collections",
+        params={"action": "LIST"},
+        timeout=HTTP_TIMEOUT,
+    )
+    check_response(response)
+    return collection_name in response.json().get("collections", [])
 
 
 def create_solr_collection(
-    temp_solr_url: str,
-    temp_collection_name: str,
+        solr_url: str,
+        collection_name: str,
     number_of_shards: int = 4,
     replication_factor: int = 2,
 ) -> None:
-    create_collection_url = f"{temp_solr_url}/admin/collections?action=CREATE&name={temp_collection_name}&numShards={number_of_shards}&replicationFactor={replication_factor}"
-    response = requests.get(create_collection_url)
-    if response.status_code == 200:
-        print(f"Collection {temp_collection_name} created successfully.")
-    else:
-        print(f"Failed to create collection {temp_collection_name}: {response.text}")
+    if collection_exists(solr_url, collection_name):
+        logger.info("Collection %s already exists, skipping creation.", collection_name)
+        return
+
+    response = requests.get(
+        f"{solr_url}/admin/collections",
+        params={
+            "action": "CREATE",
+            "name": collection_name,
+            "numShards": number_of_shards,
+            "replicationFactor": replication_factor,
+        },
+        timeout=HTTP_TIMEOUT,
+    )
+    check_response(response)
+    logger.info("Collection %s created successfully.", collection_name)
 
 
-@with_env(required_variables=["SOLR_URL", "SOLR_COLLECTION"])
 def main() -> None:
-    solr_url = os.getenv("SOLR_URL")
-    collection_name = os.getenv("SOLR_COLLECTION")
+    setup_logging()
+    solr_url, collection_name = require_env("SOLR_URL", "SOLR_COLLECTION")
     create_solr_collection(solr_url, collection_name)
 
 

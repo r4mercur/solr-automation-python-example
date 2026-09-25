@@ -2,45 +2,52 @@ import base64
 import getpass
 import hashlib
 import json
+import logging
 import os
 import time
+from pathlib import Path
 from typing import cast, Protocol
 
-import pyfiglet
 import requests
 from kazoo.client import KazooClient
 from requests.auth import HTTPBasicAuth
 
-from solr.util import with_env
+from solr.util import (
+    HTTP_TIMEOUT,
+    JSON_DIR,
+    load_json,
+    print_ascii_title,
+    require_env,
+    setup_logging,
+)
+
+logger = logging.getLogger(__name__)
+
+SECURITY_JSON_PATH = JSON_DIR / "security.json"
 
 
 class SupportsWrite(Protocol):
     def write(self, s: str) -> object: ...
 
 
-@with_env(required_variables=["ZK_HOST"])
 def security_main_for_test(password: str) -> None:
-    zk_host = os.getenv("ZK_HOST", "zoo:2181")
+    (zk_host,) = require_env("ZK_HOST")
 
-    security_json_path = os.path.join(
-        os.path.dirname(__file__), "../../json/security.json"
-    )
-    with open(security_json_path, "r", encoding="utf-8") as security_file:
-        security = json.load(security_file)
-        security["authentication"]["credentials"]["solr"] = hash_password(password)
+    security = load_json("security.json")
+    security["authentication"]["credentials"]["solr"] = hash_password(password)
 
     # Write the updated security.json
-    write_to_file(security_json_path, security)
+    write_to_file(SECURITY_JSON_PATH, security)
 
     # Upload security.json to ZooKeeper
-    upload_security_to_zookeeper(zk_host, security_json_path)
+    upload_security_to_zookeeper(zk_host, SECURITY_JSON_PATH)
     verify_upload_to_zk(zk_host)
 
     # Restart all Solr nodes
     restart_all_nodes(zk_host)
 
 
-def write_to_file(security_json_path: str, security: str) -> None:
+def write_to_file(security_json_path: Path, security: dict) -> None:
     with open(security_json_path, "w", encoding="utf-8") as security_file:
         json.dump(security, cast(SupportsWrite, security_file), indent=4)
 
@@ -58,12 +65,10 @@ def hash_password(password: str) -> str:
     return f"{hash_base64} {salt_base64}"
 
 
-def upload_security_to_zookeeper(zk_host: str, security_json_path: str) -> None:
-    print(f"Uploading security.json to ZooKeeper at {zk_host}...")
+def upload_security_to_zookeeper(zk_host: str, security_json_path: Path) -> None:
+    logger.info("Uploading security.json to ZooKeeper at %s...", zk_host)
     zk = KazooClient(hosts=zk_host)
     zk.start()
-
-    print(f"Connecting to ZooKeeper at {zk_host}...")
 
     with open(security_json_path, "r", encoding="utf-8") as security_file:
         data = json.load(security_file)
@@ -72,13 +77,13 @@ def upload_security_to_zookeeper(zk_host: str, security_json_path: str) -> None:
 
     zk_file = "/security.json"
     if zk.exists(zk_file):
-        print(f"{zk_file} already exists. Updating...")
+        logger.info("%s already exists. Updating...", zk_file)
         zk.set(zk_file, security)
     else:
-        print(f"{zk_file} does not exist. Creating...")
+        logger.info("%s does not exist. Creating...", zk_file)
         zk.create(zk_file, security)
 
-    print("Successfully uploaded security.json to ZooKeeper.")
+    logger.info("Successfully uploaded security.json to ZooKeeper.")
     zk.stop()
 
 
@@ -88,9 +93,9 @@ def verify_upload_to_zk(zk_host: str) -> None:
 
     zk_file = "/security.json"
     if zk.exists(zk_file):
-        print(f"{zk_file} exists.")
+        logger.info("%s exists.", zk_file)
     else:
-        print(f"{zk_file} does not exist.")
+        logger.error("%s does not exist.", zk_file)
 
     zk.stop()
 
@@ -99,107 +104,83 @@ def restart_all_nodes(zk_host: str) -> None:
     zk = KazooClient(hosts=zk_host)
     zk.start()
 
-    print(f"Connecting to ZooKeeper at {zk_host}...")
+    logger.info("Connecting to ZooKeeper at %s...", zk_host)
     zk.ensure_path("/restart")
     zk.set("/restart", b"1")
 
-    print("Restart signal sent. Waiting for nodes to restart...")
+    logger.info("Restart signal sent. Waiting for nodes to restart...")
     time.sleep(5)
 
     zk.stop()
-    print("All Solr nodes have been restarted.")
+    logger.info("All Solr nodes have been restarted.")
 
 
 def solr_auth(solr_url: str, username: str = "solr", password: str = "") -> None:
-    print(f"Testing Solr authentication with {solr_url}...")
+    logger.info("Testing Solr authentication with %s...", solr_url)
 
     if password == "":
-        return print("Password is empty.")
+        logger.warning("Password is empty.")
+        return
 
     try:
         response = requests.get(
-            f"{solr_url}/admin/authentication", auth=HTTPBasicAuth(username, password)
+            f"{solr_url}/admin/authentication",
+            auth=HTTPBasicAuth(username, password),
+            timeout=HTTP_TIMEOUT,
         )
         if response.status_code == 200:
-            print("Authentication successful.")
-            print(f"Solr response: {response.json()}")
+            logger.info("Authentication successful.")
+            logger.info("Solr response: %s", response.json())
         elif response.status_code == 401:
-            print("Authentication failed. Invalid credentials.")
+            logger.error("Authentication failed. Invalid credentials.")
         else:
-            print(f"Authentication failed: {response.text}")
-    except Exception as e:
-        print(f"Failed to authenticate: {e}")
+            logger.error("Authentication failed: %s", response.text)
+    except requests.RequestException as e:
+        logger.error("Failed to authenticate: %s", e)
 
 
-def print_ascii_title(title: str) -> None:
-    art = pyfiglet.figlet_format(title)
-
-    art_lines = [line for line in art.split("\n") if line.strip()]
-    max_width = max(len(line) for line in art_lines)
-
-    print("#" * (max_width + 4))
-    for line in art_lines:
-        print(f"# {line.ljust(max_width)} #")
-    print("#" * (max_width + 4))
-
-
-@with_env(required_variables=["ZK_HOST", "SOLR_URL"])
 def main() -> None:
-    zk_host = os.getenv("ZK_HOST", "zoo:2181")
-    solr_url = os.getenv("SOLR_URL")
+    setup_logging()
+    zk_host, solr_url = require_env("ZK_HOST", "SOLR_URL")
 
     print_ascii_title("SOLR SECURITY")
 
     print(
-        f"This script will update the security.json file with the hashed password for Solr security."
+        "This script will update the security.json file with the hashed password for Solr security."
     )
 
     auth_method = input("Choose authentication method (1: basic, 2: cert): ")
+    password = None
+    security = load_json("security.json")
 
     if auth_method == "1" or auth_method == "basic":
         # Dialog for user to input the password which will be used in security.json & for solr security
-        print("Prompting for password...")
         password = getpass.getpass(prompt="Enter the password for Solr security: ")
-
-        # Hash the password
-        hashed_password = hash_password(password)
-
-        # Update security.json with the hashed password
-        security_json_path = os.path.join(
-            os.path.dirname(__file__), "../../json/security.json"
-        )
-        with open(security_json_path, "r", encoding="utf-8") as security_file:
-            security = json.load(security_file)
-            security["authentication"]["credentials"]["solr"] = hashed_password
+        security["authentication"]["credentials"]["solr"] = hash_password(password)
 
     elif auth_method == "2" or auth_method == "cert":
         cert_path = input("Enter the path to the certificate file: ")
-        security_json_path = os.path.join(
-            os.path.dirname(__file__), "../../json/security.json"
-        )
-        with open(security_json_path, "r", encoding="utf-8") as security_file:
-            security = json.load(security_file)
-            security["authentication"]["class"] = "solr.CertAuthPlugin"
-            security["authentication"]["trustedCertificates"] = cert_path
+        security["authentication"]["class"] = "solr.CertAuthPlugin"
+        security["authentication"]["trustedCertificates"] = cert_path
 
     else:
         print("Invalid choice. Exiting...")
         return
 
     # Write the updated security.json
-    write_to_file(security_json_path, security)
+    write_to_file(SECURITY_JSON_PATH, security)
 
     # Upload security.json to ZooKeeper
-    upload_security_to_zookeeper(zk_host, security_json_path)
+    upload_security_to_zookeeper(zk_host, SECURITY_JSON_PATH)
     verify_upload_to_zk(zk_host)
 
     # Restart all Solr nodes
     restart_all_nodes(zk_host)
 
-    # Test Solr authentication
-    time.sleep(5)
-    solr_url = os.getenv("SOLR_URL")
-    solr_auth(solr_url, username="solr", password=password)
+    # Test Solr authentication (only possible with basic auth)
+    if password:
+        time.sleep(5)
+        solr_auth(solr_url, username="solr", password=password)
 
 
 if __name__ == "__main__":

@@ -1,26 +1,23 @@
-import os
+import logging
 
 from solr.usage.document import get_solr_client
-from solr.util import with_env
+from solr.util import require_env, setup_logging
+
+logger = logging.getLogger(__name__)
 
 
 def delete_all_documents(solr_url: str, collection_name: str) -> None:
-    try:
-        client = get_solr_client(solr_url, collection_name)
-        client.delete(q="*:*")
+    client = get_solr_client(solr_url, collection_name)
+    client.delete(q="*:*")
 
-        print(f"All Documents from collection '{collection_name}' were deleted.")
-
-    except Exception as e:
-        print(f"Error when trying to delete documents: {e}")
+    logger.info("All documents from collection '%s' were deleted.", collection_name)
 
 
-@with_env(required_variables=["SOLR_URL", "SOLR_COLLECTION"])
 def main() -> None:
-    solr_url = os.getenv("SOLR_URL")
-    collection_name = os.getenv("SOLR_COLLECTION")
+    setup_logging()
+    solr_url, collection_name = require_env("SOLR_URL", "SOLR_COLLECTION")
 
-    print(f"Delete all documents from {solr_url}/{collection_name}...")
+    logger.info("Delete all documents from %s/%s...", solr_url, collection_name)
     delete_all_documents(solr_url, collection_name)
 
 

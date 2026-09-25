@@ -1,61 +1,63 @@
-import json
-import os
+import logging
 
 import requests
 
-from solr.util import with_env
+from solr.util import (
+    HTTP_TIMEOUT,
+    check_response,
+    load_json,
+    require_env,
+    setup_logging,
+)
+
+logger = logging.getLogger(__name__)
 
 
-def update_solr_schema(
-    temp_solr_url: str, temp_collection_name: str, temp_schema: dict
-) -> None:
-    schema_url = f"{temp_solr_url}/{temp_collection_name}/schema"
-    response = requests.get(schema_url)
+def update_solr_schema(solr_url: str, collection_name: str, schema: dict) -> None:
+    schema_url = f"{solr_url}/{collection_name}/schema"
+    response = check_response(requests.get(schema_url, timeout=HTTP_TIMEOUT))
 
-    if response.status_code != 200:
-        print(f"Failed to retrieve current schema: {response.text}")
-        return
+    current_schema = response.json().get("schema", {})
 
-    current_schema = response.json()
-    temp_current_schema = current_schema.get("schema", {})
-
-    current_version = temp_current_schema.get("version", 1.0)
-    existing_fields = {field["name"] for field in temp_current_schema.get("fields", [])}
+    current_version = current_schema.get("version", 1.0)
+    existing_fields = {field["name"] for field in current_schema.get("fields", [])}
     existing_field_types = {
-        field["name"] for field in temp_current_schema.get("fieldTypes", [])
+        field["name"] for field in current_schema.get("fieldTypes", [])
+    }
+    existing_dynamic_fields = {
+        field["name"] for field in current_schema.get("dynamicFields", [])
     }
 
-    json_fields = {field["name"] for field in temp_schema.get("add-field", [])}
-    json_delete_fields = {
-        field["name"] for field in temp_schema.get("delete-field", [])
-    }
+    json_fields = {field["name"] for field in schema.get("add-field", [])}
+    json_delete_fields = {field["name"] for field in schema.get("delete-field", [])}
 
     new_field_types = [
         ft
-        for ft in temp_schema.get("add-field-type", [])
+        for ft in schema.get("add-field-type", [])
         if ft["name"] not in existing_field_types
     ]
 
     new_fields = [
         field
-        for field in temp_schema.get("add-field", [])
+        for field in schema.get("add-field", [])
         if field["name"] not in existing_fields
     ]
 
+    new_dynamic_fields = [
+        field
+        for field in schema.get("add-dynamic-field", [])
+        if field["name"] not in existing_dynamic_fields
+    ]
+
     necessary_fields = {"id", "_text_", "_nest_path_", "_root_", "_version_"}
-    fields_to_remove = [
+    # Remove fields that are no longer in the json or explicitly marked for deletion
+    # (a set, so a field matching both conditions is only deleted once)
+    fields_to_remove = {
         field
         for field in existing_fields
-        if field not in json_fields and field not in necessary_fields
-    ]
-    # Include fields explicitly marked for deletion
-    fields_to_remove.extend(
-        [
-            field
-            for field in json_delete_fields
-            if field in existing_fields and field not in necessary_fields
-        ]
-    )
+        if (field not in json_fields or field in json_delete_fields)
+           and field not in necessary_fields
+    }
 
     update_payload = {}
 
@@ -65,50 +67,47 @@ def update_solr_schema(
     if new_fields:
         update_payload["add-field"] = new_fields
 
+    if new_dynamic_fields:
+        update_payload["add-dynamic-field"] = new_dynamic_fields
+
     if fields_to_remove:
-        update_payload["delete-field"] = [{"name": field} for field in fields_to_remove]
+        update_payload["delete-field"] = [
+            {"name": field} for field in sorted(fields_to_remove)
+        ]
 
-    if new_field_types:
-        print(f"Adding new field types: {new_field_types}")
-
-    if not new_fields and not fields_to_remove:
-        print(f"No changes to the schema with version: {current_version}")
+    if not update_payload:
+        logger.info("No changes to the schema with version: %s", current_version)
         return
 
-    response = requests.post(schema_url, json=update_payload)
-    if response.status_code == 200:
-        print("Schema updated successfully.")
-        commit_url = f"{temp_solr_url}/{temp_collection_name}/update?commit=true"
-        commit_response = requests.get(commit_url)
-        if commit_response.status_code == 200:
-            print("Changes committed successfully.")
-        else:
-            print(f"Failed to commit changes: {commit_response.text}")
-    else:
-        print(f"Failed to update schema: {response.text}")
+    logger.info("Updating schema: %s", update_payload)
+    check_response(requests.post(schema_url, json=update_payload, timeout=HTTP_TIMEOUT))
+    logger.info("Schema updated successfully.")
 
-
-def reload_solr_collection(temp_solr_url: str, temp_collection_name: str) -> None:
-    reload_url = (
-        f"{temp_solr_url}/admin/collections?action=RELOAD&name={temp_collection_name}"
+    check_response(
+        requests.get(
+            f"{solr_url}/{collection_name}/update",
+            params={"commit": "true"},
+            timeout=HTTP_TIMEOUT,
+        )
     )
-    response = requests.get(reload_url)
-    if response.status_code == 200:
-        print(f"Collection {temp_collection_name} reloaded successfully.")
-    else:
-        print(f"Failed to reload collection {temp_collection_name}: {response.text}")
+    logger.info("Changes committed successfully.")
 
 
-@with_env(required_variables=["SOLR_URL", "SOLR_COLLECTION"])
+def reload_solr_collection(solr_url: str, collection_name: str) -> None:
+    response = requests.get(
+        f"{solr_url}/admin/collections",
+        params={"action": "RELOAD", "name": collection_name},
+        timeout=HTTP_TIMEOUT,
+    )
+    check_response(response)
+    logger.info("Collection %s reloaded successfully.", collection_name)
+
+
 def main() -> None:
-    solr_url = os.getenv("SOLR_URL")
-    collection_name = os.getenv("SOLR_COLLECTION")
+    setup_logging()
+    solr_url, collection_name = require_env("SOLR_URL", "SOLR_COLLECTION")
 
-    schema_file_path = os.path.join(os.path.dirname(__file__), "../../json/fields.json")
-    with open(schema_file_path, "r") as schema_file:
-        schema = json.load(schema_file)
-
-    update_solr_schema(solr_url, collection_name, schema)
+    update_solr_schema(solr_url, collection_name, load_json("fields.json"))
     reload_solr_collection(solr_url, collection_name)
 
 

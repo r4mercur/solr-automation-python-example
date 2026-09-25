@@ -1,10 +1,7 @@
-import os
-
 import pysolr
 
-from solr.setup.security import print_ascii_title
 from solr.usage.document import get_solr_client
-from solr.util import with_env
+from solr.util import print_ascii_title, require_env
 
 
 def query_solr_collection(client: pysolr.Solr) -> str:
@@ -42,11 +39,7 @@ def query_by_age_range(client: pysolr.Solr, min_age: int, max_age: int) -> list[
 def query_by_gender_and_city(client: pysolr.Solr, gender: str, city: str) -> list[str]:
     results = client.search(
         f"gender:{gender} AND city:{city}",
-        **{"q.op": "AND"},
-        **{
-            "indent": "true",
-            "q.op": "AND",
-        },
+        **{"q.op": "AND", "indent": "true"},
     )
 
     return [str(result) for result in results]
@@ -60,12 +53,10 @@ def query_with_boosting(client: pysolr.Solr, search_term: str) -> list[str]:
     return [str(result) for result in results]
 
 
-@with_env(required_variables=["SOLR_URL", "SOLR_COLLECTION"])
 def main() -> None:
+    solr_url, collection_name = require_env("SOLR_URL", "SOLR_COLLECTION")
     print_ascii_title("SOLR QUERY")
 
-    solr_url = os.getenv("SOLR_URL")
-    collection_name = os.getenv("SOLR_COLLECTION")
     solr_client = get_solr_client(solr_url, collection_name)
 
     print("Querying without filter...")

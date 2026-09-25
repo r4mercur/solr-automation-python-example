@@ -1,4 +1,3 @@
-import json
 import os
 import time
 import unittest
@@ -9,7 +8,7 @@ from testcontainers.compose import DockerCompose
 from solr.setup.core import create_solr_collection
 from solr.setup.schema import update_solr_schema, reload_solr_collection
 from solr.usage.document import create_documents
-from solr.util import with_env
+from solr.util import load_json, with_env
 
 
 class TestImplementationSolr(unittest.TestCase):
@@ -55,11 +54,7 @@ class TestImplementationSolr(unittest.TestCase):
         self.assertIn(self.collection_name, response.json()["status"])
 
     def test_solr_schema_implementation(self):
-        schema_file_path = os.path.join(
-            os.path.dirname(__file__), "../json/fields.json"
-        )
-        with open(schema_file_path, "r") as schema_file:
-            schema = json.load(schema_file)
+        schema = load_json("fields.json")
 
         update_solr_schema(self.solr_url, self.collection_name, schema)
         reload_solr_collection(self.solr_url, self.collection_name)
@@ -75,11 +70,7 @@ class TestImplementationSolr(unittest.TestCase):
             self.assertIn(field["name"], fields_in_schema)
 
     def test_documents_solr_implementation(self):
-        schema_file_path = os.path.join(
-            os.path.dirname(__file__), "../json/fields.json"
-        )
-        with open(schema_file_path, "r") as schema_file:
-            schema = json.load(schema_file)
+        schema = load_json("fields.json")
 
         update_solr_schema(self.solr_url, self.collection_name, schema)
         reload_solr_collection(self.solr_url, self.collection_name)

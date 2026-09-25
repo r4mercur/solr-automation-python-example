@@ -19,4 +19,4 @@ COPY . .
 ENV PYTHONUNBUFFERED=1
 
 # Run the automatation & make sure the right values in .env are configured
-CMD [ "python", "solr" ]
+CMD [ "python", "-m", "solr" ]

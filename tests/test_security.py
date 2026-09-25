@@ -1,13 +1,13 @@
 import os
 import time
 import unittest
-import requests
 
+import requests
 from requests.auth import HTTPBasicAuth
 from testcontainers.compose import DockerCompose
 
 from solr import security_main_for_test
-from solr.util import with_env
+from solr.util import JSON_DIR, with_env
 
 
 class TestSecuritySolrCloud(unittest.TestCase):
@@ -30,9 +30,8 @@ class TestSecuritySolrCloud(unittest.TestCase):
     def test_upload_security_to_zookeeper(self):
         security_main_for_test(password='password')
 
-        with open(os.path.join(os.path.dirname(__file__), '../json/security.json'), 'r', encoding='utf-8') as security_file:
-            security = security_file.read()
-            self.assertIn('solr', security)
+        security = (JSON_DIR / 'security.json').read_text(encoding='utf-8')
+        self.assertIn('solr', security)
 
     def test_verify_security_is_enabled(self):
         security_main_for_test(password='password')

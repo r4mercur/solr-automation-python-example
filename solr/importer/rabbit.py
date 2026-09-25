@@ -1,31 +1,58 @@
 import json
+import logging
 
 import pika
+import pysolr
 
 from solr.usage.document import get_solr_client
+from solr.util import require_env, setup_logging
 
-solr = get_solr_client()
-rabbit_url = "amqp://guest:guest@localhost:5672/"
-connection = pika.BlockingConnection(pika.ConnectionParameters(rabbit_url))
-channel = connection.channel()
+logger = logging.getLogger(__name__)
 
-queue_name = "solr_import_queue"
-channel.queue_declare(queue=queue_name, durable=True)
+QUEUE_NAME = "solr_import_queue"
 
 
-def callback(ch, method, _, body):
+def import_message(solr: pysolr.Solr, body: bytes) -> None:
+    data = json.loads(body)
+    documents = data if isinstance(data, list) else [data]
+    solr.add(documents)
+    solr.commit()
+
+
+def create_callback(solr: pysolr.Solr):
+    def callback(ch, method, _, body):
+        try:
+            import_message(solr, body)
+            logger.info("Data imported successfully: %s", body)
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+        except Exception as e:
+            logger.error("Error importing data: %s", e)
+            # requeue=False: a broken message would otherwise be redelivered forever
+            ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+
+    return callback
+
+
+def main() -> None:
+    setup_logging()
+    solr_url, collection_name, rabbitmq_url = require_env(
+        "SOLR_URL", "SOLR_COLLECTION", "RABBITMQ_URL"
+    )
+    solr = get_solr_client(solr_url, collection_name)
+
+    connection = pika.BlockingConnection(pika.URLParameters(rabbitmq_url))
+    channel = connection.channel()
+    channel.queue_declare(queue=QUEUE_NAME, durable=True)
+    channel.basic_consume(queue=QUEUE_NAME, on_message_callback=create_callback(solr))
+
+    logger.info("Waiting for messages. To exit press CTRL+C")
     try:
-        data = json.loads(body)
-        solr.add(data)
-        solr.commit()
-        print("Data imported successfully:", data)
-        ch.basic_ack(delivery_tag=method.delivery_tag)
-    except Exception as e:
-        print("Error importing data:", e)
-        ch.basic_nack(delivery_tag=method.delivery_tag)
+        channel.start_consuming()
+    except KeyboardInterrupt:
+        channel.stop_consuming()
+    finally:
+        connection.close()
 
 
-channel.basic_consume(queue=queue_name, on_message_callback=callback)
-
-print("Waiting for messages. To exit press CTRL+C")
-channel.start_consuming()
+if __name__ == "__main__":
+    main()

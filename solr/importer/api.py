@@ -1,12 +1,13 @@
-import json
+import logging
 import os
 
 from flask import Flask, request
 from flask_restx import Api, Resource, fields
-from pydantic import ValidationError
 
 from solr.usage.document import SolrImportPayload, SolrDocument, get_solr_client
-from solr.util import with_env
+from solr.util import require_env, setup_logging
+
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 api = Api(app, version="1.0", description="Solr Import API", doc="/swagger/")
@@ -14,14 +15,16 @@ api = Api(app, version="1.0", description="Solr Import API", doc="/swagger/")
 document_model = api.model(
     "SolrDocument",
     {
-        "id": fields.String(required=True, description="Document ID"),
-        "title": fields.String(required=True, description="Document Title"),
-        "content": fields.String(required=True, description="Document Content"),
+        "id": fields.Integer(required=True, description="Document ID"),
+        "gender": fields.String(required=True, example="Female"),
+        "age": fields.Integer(required=True, min=18, max=80),
+        "name": fields.String(required=True),
+        "email": fields.String(required=True, example="jane.doe@example.com"),
+        "address": fields.String(required=True),
+        "city": fields.String(required=True),
+        "state": fields.String(required=True),
+        "search_for": fields.String(required=True, example="Male"),
     },
-)
-
-import_payload = api.model(
-    "ImportPayload", {"documents": fields.List(fields.Nested(document_model))}
 )
 
 response_model = api.model(
@@ -35,7 +38,8 @@ response_model = api.model(
 
 @api.route("/import")
 class ImportResource(Resource):
-    @api.expect(import_payload)
+    # Accepts a list of documents (shown in Swagger) or a single document
+    @api.expect([document_model])
     @api.response(200, "Success", response_model)
     @api.response(400, "Validation Error", response_model)
     @api.response(500, "Internal Server Error", response_model)
@@ -43,19 +47,20 @@ class ImportResource(Resource):
         client = get_solr_client(os.getenv("SOLR_URL"), os.getenv("SOLR_COLLECTION"))
 
         try:
-            raw_data = request.get_json()
+            # silent=True: invalid JSON returns None and ends up as a 400 below
+            raw_data = request.get_json(silent=True)
             payload = validate_payload(raw_data)
 
             solr_documents = [doc.model_dump() for doc in payload.documents]
-            json_data = json.dumps(solr_documents).encode("utf-8")
 
-            client.add(json_data)
+            client.add(solr_documents)
             client.commit()
             return {"status": "OK"}, 200
 
-        except ValidationError as e:
+        except ValueError as e:  # includes pydantic's ValidationError
             return {"error": f"Validation Error: {str(e)}"}, 400
         except Exception as e:
+            logger.exception("Import into Solr failed")
             return {"error": str(e)}, 500
 
 
@@ -70,9 +75,11 @@ def validate_payload(raw_data) -> SolrImportPayload:
     return payload
 
 
-@with_env(required_variables=["SOLR_URL", "SOLR_COLLECTION"])
-def main():
-    app.run(port=5000, debug=True)
+def main() -> None:
+    setup_logging()
+    require_env("SOLR_URL", "SOLR_COLLECTION")
+    # Flask reads FLASK_DEBUG (e.g. from .env) itself, so debug mode is off by default
+    app.run(port=5000)
 
 
 if __name__ == "__main__":

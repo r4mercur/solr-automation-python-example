@@ -1,20 +1,16 @@
 import json
-import os
+import logging
 from argparse import ArgumentParser, Namespace
 
 from sentence_transformers import SentenceTransformer
 
 from solr.usage.document import generate_documents, get_solr_client
-from solr.util import with_env
+from solr.util import load_json, require_env, setup_logging
+
+logger = logging.getLogger(__name__)
 
 SEMANTIC_WITH_PRETRAINED_MODEL = False
 HYBRID_SEARCH_WITH_SOLR_LTR = False
-
-
-def load_queries_from_json(file_path: str) -> dict:
-    with open(file_path, "r") as file:
-        queries = json.load(file)
-    return queries
 
 
 def index_document_with_embeddings(doc: dict, model: SentenceTransformer) -> dict:
@@ -51,18 +47,17 @@ def semantic_search(
     solr = get_solr_client(solr_url, "")
     results = solr.search(**params)
 
-    print(
-        f"Found {len(results.docs)} results with KNN search, lasted for {results.qtime}ms"
+    logger.info(
+        "Found %d results with KNN search, lasted for %sms",
+        len(results.docs),
+        results.qtime,
     )
     return results.docs
 
 
 def load_solr_fields() -> list[str]:
-    results = []
-    with open("../../json/fields.json", "r") as schema_file:
-        schema = json.load(schema_file)
-        for field in schema["add-field"]:
-            results.append(field["name"])
+    schema = load_json("fields.json")
+    results = [field["name"] for field in schema["add-field"]]
 
     if results is None or len(results) == 0:
         raise Exception("No fields in fields.json defined")
@@ -93,15 +88,14 @@ def hybrid_search(
 
     solr = get_solr_client(solr_url, "")
     results = solr.search(**params)
-    print(f"Found {len(results.docs)} results with hybrid search")
+    logger.info("Found %d results with hybrid search", len(results.docs))
 
     return results.docs
 
 
-@with_env(required_variables=["SOLR_URL", "SOLR_COLLECTION"])
 def main() -> None:
-    solr_url = os.getenv("SOLR_URL")
-    collection_name = os.getenv("SOLR_COLLECTION")
+    setup_logging()
+    solr_url, collection_name = require_env("SOLR_URL", "SOLR_COLLECTION")
 
     solr_url_with_collection = f"{solr_url}/{collection_name}"
     solr = get_solr_client(solr_url, collection_name)
@@ -123,7 +117,7 @@ def main() -> None:
         solr.commit()
 
         response = solr.search("*:*", rows=5)
-        print(f"Total documents in Solr: {response.hits}")
+        logger.info("Total documents in Solr: %d", response.hits)
         print(
             "Sample document:",
             json.dumps(
@@ -132,7 +126,7 @@ def main() -> None:
         )
 
         # fyi: find similar documents based on this query sentence
-        queries = load_queries_from_json("../../json/sentences.json")
+        queries = load_json("sentences.json")
         sentences = queries["sentences"]
         query = sentences[0]["content"]
         results = semantic_search(query, solr_url_with_collection, model)
@@ -147,14 +141,16 @@ def main() -> None:
         # Generate and index documents if none exist
         response = solr.search("*:*", rows=1)
         if response.hits == 0:
-            print("No documents found in index. Generating and indexing documents...")
+            logger.info(
+                "No documents found in index. Generating and indexing documents..."
+            )
             documents = generate_documents(0, 1000)
             documents_with_embeddings = [
                 index_document_with_embeddings(doc, model) for doc in documents
             ]
             solr.add(documents_with_embeddings)
             solr.commit()
-            print(f"Indexed {len(documents)} documents with embeddings")
+            logger.info("Indexed %d documents with embeddings", len(documents))
 
         # Perform hybrid search
         query = "looking for someone who likes hiking and outdoor activities"

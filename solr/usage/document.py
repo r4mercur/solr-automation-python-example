@@ -1,3 +1,4 @@
+import logging
 import os
 import threading
 import time
@@ -10,11 +11,12 @@ from faker.proxy import Faker
 from prometheus_client import Counter, Gauge, start_http_server
 from pydantic import BaseModel, EmailStr, Field, ValidationError, ConfigDict
 
-from solr.util import with_env, get_or_create_metric
+from solr.util import get_or_create_metric, require_env, setup_logging
+
+logger = logging.getLogger(__name__)
 
 _client_counter = threading.Lock()
 _current_client_index = 0
-turn_on_document_print = False
 
 # Define Prometheus metrics
 DOCUMENTS_PROCESSED = get_or_create_metric(
@@ -94,16 +96,23 @@ def add_documents_to_solr(
                 break
             except (pysolr.SolrError, ConnectionError) as e:
                 if attempt == max_retries - 1:  # Letzter Versuch
-                    print(f"Failed to add documents after {max_retries} attempts: {e}")
+                    logger.error(
+                        "Failed to add documents after %d attempts: %s", max_retries, e
+                    )
                     raise
                 else:
-                    print(f"Timeout attempt {attempt + 1}, retrying...")
+                    logger.warning(
+                        "Attempt %d failed (%s), retrying...", attempt + 1, e
+                    )
                     time.sleep(2**attempt)
 
         global_start = start_doc_id + index
         global_end = start_doc_id + min(index + batch_size, len(documents))
-        print(
-            f"Added documents {global_start} to {global_end} to Solr using client {client_index}"
+        logger.info(
+            "Added documents %d to %d to Solr using client %d",
+            global_start,
+            global_end,
+            client_index,
         )
 
 
@@ -127,12 +136,10 @@ def generate_documents(start_index: int, chunk_size: int) -> list:
                 search_for=str(genders[index]),
             )
             documents.append(document.model_dump())
-            DOCUMENTS_PROCESSED.labels(status="processed").inc()
 
-            if turn_on_document_print:
-                print(f"Generated document {id_}:{documents[-1]}")
+            logger.debug("Generated document %d: %s", id_, documents[-1])
         except ValidationError as e:
-            print(f"Validation error for document {id_}: {e}")
+            logger.warning("Validation error for document %d: %s", id_, e)
 
     return documents
 
@@ -152,8 +159,9 @@ def create_documents(
     max_processes = os.cpu_count() or 16
     number_of_threads = 100
 
+    # initializer: worker processes don't inherit the logging config on Windows (spawn)
     with ProcessPoolExecutor(
-        max_workers=max_processes
+            max_workers=max_processes, initializer=setup_logging
     ) as process_executors, ThreadPoolExecutor(
         max_workers=number_of_threads
     ) as threads_executors:
@@ -168,6 +176,9 @@ def create_documents(
 
         for future in as_completed(futures):
             documents = future.result()
+            # Count in the main process: metrics incremented inside the worker
+            # processes never reach the Prometheus HTTP server started here
+            DOCUMENTS_PROCESSED.labels(status="processed").inc(len(documents))
             start_doc_id = futures_to_start_index[future]
             tasks.append(
                 threads_executors.submit(
@@ -180,13 +191,14 @@ def create_documents(
 
     end_time = time.time()
     PROCESS_TIME.set(end_time - start_time)
-    print(f"Documents added successfully in {end_time - start_time} seconds.")
+    logger.info(
+        "Documents added successfully in %.2f seconds.", end_time - start_time
+    )
 
 
-@with_env(required_variables=["SOLR_URL", "SOLR_COLLECTION"])
 def main() -> None:
-    solr_url = os.getenv("SOLR_URL")
-    collection_name = os.getenv("SOLR_COLLECTION")
+    setup_logging()
+    solr_url, collection_name = require_env("SOLR_URL", "SOLR_COLLECTION")
     # start monitoring
     start_http_server(8000)
     create_documents(solr_url, collection_name, 1000000, 5000)

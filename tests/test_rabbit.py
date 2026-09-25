@@ -6,11 +6,11 @@ import unittest
 import uuid
 
 import pika
-import pysolr 
+import pysolr
 from testcontainers.compose import DockerCompose
 
 from solr import create_solr_collection, update_solr_schema
-from solr.util import with_env
+from solr.util import load_json, with_env
 
 
 class TestSolrRabbitIntegration(unittest.TestCase):
@@ -27,12 +27,9 @@ class TestSolrRabbitIntegration(unittest.TestCase):
 
         # create solr collection & update schema
         create_solr_collection(self.solr_url, self.solr_collection)
-        schema_file_path = os.path.join(
-            os.path.dirname(__file__), "../json/fields.json"
+        update_solr_schema(
+            self.solr_url, self.solr_collection, load_json("fields.json")
         )
-        with open(schema_file_path, "r") as schema_file:
-            schema = json.load(schema_file)
-            update_solr_schema(self.solr_url, self.solr_collection, schema)
 
         self.solr = pysolr.Solr(
             f"{self.solr_url}/{self.solr_collection}", always_commit=True
